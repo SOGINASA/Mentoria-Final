@@ -6,7 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from constants import (
-    ROLE_SENDER, STATUS_PENDING, TYPE_NO_DEDUCTION, IIKO_NONE,
+    ROLE_SENDER, STATUS_PENDING, TYPE_NO_DEDUCTION, IIKO_NONE, SOURCE_MANUAL,
 )
 
 db = SQLAlchemy()
@@ -142,6 +142,8 @@ class WriteOff(db.Model):
 
     comment = db.Column(db.Text, nullable=False)  # обязательный, мин. 10 символов (валидация в роуте)
     status = db.Column(db.String(20), nullable=False, default=STATUS_PENDING, index=True)
+    # Источник: manual (создал сотрудник) | auto_fall (камера+ML по падению)
+    source = db.Column(db.String(20), nullable=False, default=SOURCE_MANUAL, index=True)
 
     # Проверка
     reviewer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
@@ -174,6 +176,7 @@ class WriteOff(db.Model):
             'store_id': self.store_id,
             'store': self.store.to_dict() if self.store else None,
             'type': self.type,
+            'source': self.source,
             'deduction_employee_id': self.deduction_employee_id,
             'deduction_employee': self.deduction_employee.to_dict() if self.deduction_employee else None,
             'comment': self.comment,
@@ -236,4 +239,41 @@ class WriteOffItem(db.Model):
             'quantity': self.quantity,
             'unit': self.unit,
             'iiko_product_id': self.iiko_product_id,
+        }
+
+
+class Notification(db.Model):
+    """Уведомление пользователю (лента, опрашивается фронтом).
+    Используется для авто-падений: сотруднику — подтвердить черновик,
+    проверяющему — новая заявка ожидает проверки."""
+    __tablename__ = 'notifications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)  # получатель
+    kind = db.Column(db.String(30), nullable=False)  # fall_draft | review_pending
+    title = db.Column(db.String(160), nullable=False)
+    body = db.Column(db.Text, nullable=True)
+    write_off_id = db.Column(db.Integer, db.ForeignKey('write_offs.id'), nullable=True, index=True)
+    is_read = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=_now, index=True)
+
+    write_off = db.relationship('WriteOff', foreign_keys=[write_off_id])
+
+    def to_dict(self):
+        wo = self.write_off
+        return {
+            'id': self.id,
+            'kind': self.kind,
+            'title': self.title,
+            'body': self.body,
+            'write_off_id': self.write_off_id,
+            'is_read': self.is_read,
+            'created_at': _utc_iso(self.created_at),
+            # Короткая сводка по заявке для карточки уведомления
+            'write_off': {
+                'id': wo.id,
+                'status': wo.status,
+                'source': wo.source,
+                'photo_url': wo.photos[0].url if wo.photos else None,
+            } if wo else None,
         }

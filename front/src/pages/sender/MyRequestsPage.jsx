@@ -7,7 +7,7 @@ import Spinner from '../../components/ui/Spinner';
 import Button from '../../components/ui/Button';
 import { useI18n } from '../../i18n/useI18n';
 import { useWriteOffStore } from '../../store/writeOffStore';
-import { STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED } from '../../constants/statuses';
+import { STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED } from '../../constants/statuses';
 
 export default function MyRequestsPage() {
   const navigate = useNavigate();
@@ -25,6 +25,7 @@ export default function MyRequestsPage() {
 
   const tabs = [
     { key: 'all', label: t.tab_all },
+    { key: STATUS_DRAFT, label: t.st_draft_s },
     { key: STATUS_PENDING, label: t.st_pending_s },
     { key: STATUS_APPROVED, label: t.st_approved_s },
     { key: STATUS_REJECTED, label: t.st_rejected_s },

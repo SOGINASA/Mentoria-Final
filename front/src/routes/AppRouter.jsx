@@ -13,6 +13,7 @@ import ReviewDetailPage from '../pages/reviewer/ReviewDetailPage';
 import ReviewHistoryPage from '../pages/reviewer/ReviewHistoryPage';
 import AdminPage from '../pages/admin/AdminPage';
 import ProfilePage from '../pages/common/ProfilePage';
+import NotificationsPage from '../pages/common/NotificationsPage';
 import NotFoundPage from '../pages/common/NotFoundPage';
 
 const sender = (el) => <RequireRole roles={[ROLE_SENDER]}>{el}</RequireRole>;
@@ -53,6 +54,7 @@ export default function AppRouter() {
         <Route path="/admin" element={admin(<AdminPage />)} />
 
         {/* Общее */}
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
 

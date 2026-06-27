@@ -11,11 +11,15 @@ from models import db, WriteOff, WriteOffPhoto, WriteOffItem, Store, Employee
 from utils.auth_helpers import get_current_user, role_required
 from utils.validators import parse_date
 from utils.request_helpers import get_pagination
+from utils.uploads import save_image_file
 from services import iiko_service
+from services.notifications import notify, notify_reviewers
 from constants import (
     ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN,
-    STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUSES,
+    STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUSES,
     TYPE_NO_DEDUCTION, TYPE_WITH_DEDUCTION, WRITEOFF_TYPES,
+    SOURCE_MANUAL, SOURCE_AUTO_FALL,
+    NOTIFY_FALL_DRAFT, NOTIFY_REVIEW_PENDING,
     IIKO_PENDING, IIKO_SYNCED, IIKO_FAILED, MIN_COMMENT_LENGTH,
 )
 
@@ -81,6 +85,7 @@ def create_write_off():
             deduction_employee_id=deduction_employee_id,
             comment=comment,
             status=STATUS_PENDING,
+            source=SOURCE_MANUAL,
         )
         db.session.add(wo)
         db.session.flush()
@@ -110,6 +115,138 @@ def create_write_off():
 
 
 # --------------------------------------------------------------------------- #
+# Авто-падение: камера/ML фиксирует падение продукта → черновик заявки
+# --------------------------------------------------------------------------- #
+@writeoffs_bp.route('/auto-fall', methods=['POST'])
+@role_required(ROLE_SENDER)
+def create_fall_draft():
+    """Принимает событие падения от ML-пайплайна (камера логинится как
+    отправитель точки). multipart-форма:
+        file        — скриншот кадра в момент падения (обязательно)
+        product     — класс детектора (patty/bun/...) (обязательно)
+        product_ru  — отображаемое имя (опц., иначе = product)
+        reason      — текст причины (опц., иначе авто-формулировка)
+        track_id    — id трека ByteTrack (опц., для текста)
+        confidence  — уверенность детекции (опц.)
+        quantity, unit — позиция списания (опц.)
+    Создаёт ЧЕРНОВИК (status=draft, source=auto_fall) и уведомляет автора —
+    сотрудник подтверждает одним тапом (см. /<id>/confirm)."""
+    user = get_current_user()
+
+    if not user.store_id:
+        return jsonify({'error': 'У аккаунта камеры не задана торговая точка'}), 400
+
+    product = (request.form.get('product') or '').strip()
+    if not product:
+        return jsonify({'error': 'Не указан продукт (product)'}), 400
+    product_ru = (request.form.get('product_ru') or product).strip()
+    track_id = (request.form.get('track_id') or '').strip()
+
+    reason = (request.form.get('reason') or '').strip()
+    if not reason:
+        suffix = f' (трек #{track_id})' if track_id else ''
+        reason = (f'Падение продукта «{product_ru}» на пол — '
+                  f'списание по санитарным нормам{suffix}')
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'Не передан скриншот кадра (поле file)'}), 400
+    try:
+        photo_url, _ = save_image_file(request.files['file'])
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    try:
+        wo = WriteOff(
+            author_id=user.id,
+            store_id=user.store_id,
+            type=TYPE_NO_DEDUCTION,
+            comment=reason,
+            status=STATUS_DRAFT,
+            source=SOURCE_AUTO_FALL,
+        )
+        db.session.add(wo)
+        db.session.flush()
+
+        db.session.add(WriteOffPhoto(write_off_id=wo.id, url=photo_url))
+        db.session.add(WriteOffItem(
+            write_off_id=wo.id,
+            product_name=product_ru,
+            quantity=float(request.form.get('quantity') or 1),
+            unit=(request.form.get('unit') or 'шт').strip(),
+        ))
+
+        # Уведомление сотруднику: подтвердите черновик
+        notify(
+            user.id, NOTIFY_FALL_DRAFT,
+            title='Зафиксировано падение продукта',
+            body=f'{product_ru}: {reason}. Подтвердите черновик списания.',
+            write_off_id=wo.id, commit=False,
+        )
+
+        db.session.commit()
+        return jsonify({'write_off': wo.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Ошибка создания черновика: {e}'}), 500
+
+
+# --------------------------------------------------------------------------- #
+# Подтверждение черновика (отправитель) → заявка уходит проверяющему
+# --------------------------------------------------------------------------- #
+@writeoffs_bp.route('/<int:wo_id>/confirm', methods=['POST'])
+@role_required(ROLE_SENDER)
+def confirm_draft(wo_id):
+    """Сотрудник подтверждает авто-черновик одним тапом. Можно уточнить
+    тип/комментарий/сотрудника для удержания. status: draft → pending,
+    проверяющие получают уведомление."""
+    user = get_current_user()
+    wo = WriteOff.query.get(wo_id)
+    if not wo:
+        return jsonify({'error': 'Заявка не найдена'}), 404
+    if wo.author_id != user.id:
+        return jsonify({'error': 'Подтвердить черновик может только его автор'}), 403
+    if wo.status != STATUS_DRAFT:
+        return jsonify({'error': 'Заявка уже подтверждена или обработана'}), 409
+
+    data = request.get_json(silent=True) or {}
+
+    # Необязательные правки при подтверждении
+    new_comment = (data.get('comment') or '').strip()
+    if new_comment:
+        if len(new_comment) < MIN_COMMENT_LENGTH:
+            return jsonify({'error': f'Комментарий минимум {MIN_COMMENT_LENGTH} символов'}), 400
+        wo.comment = new_comment
+
+    new_type = data.get('type')
+    if new_type is not None:
+        if new_type not in WRITEOFF_TYPES:
+            return jsonify({'error': 'Неверный тип списания'}), 400
+        wo.type = new_type
+        if new_type == TYPE_WITH_DEDUCTION:
+            emp_id = data.get('deduction_employee_id')
+            emp = Employee.query.filter_by(id=emp_id, is_active=True).first() if emp_id else None
+            if not emp:
+                return jsonify({'error': 'При удержании нужно выбрать сотрудника'}), 400
+            if emp.store_id and emp.store_id != wo.store_id:
+                return jsonify({'error': 'Сотрудник не относится к точке заявки'}), 400
+            wo.deduction_employee_id = emp.id
+        else:
+            wo.deduction_employee_id = None
+
+    wo.status = STATUS_PENDING
+    db.session.flush()
+
+    notify_reviewers(
+        NOTIFY_REVIEW_PENDING,
+        title='Новая заявка на списание (падение)',
+        body=f'{wo.store.name if wo.store else "Точка"}: {wo.comment}',
+        write_off_id=wo.id, commit=False,
+    )
+    db.session.commit()
+    return jsonify({'write_off': wo.to_dict()})
+
+
+# --------------------------------------------------------------------------- #
 # Список
 # --------------------------------------------------------------------------- #
 @writeoffs_bp.route('', methods=['GET'])
@@ -132,6 +269,10 @@ def list_write_offs():
         if status not in STATUSES:
             return jsonify({'error': 'Неверный статус'}), 400
         query = query.filter(WriteOff.status == status)
+    elif user.role in (ROLE_REVIEWER, ROLE_ADMIN):
+        # Проверяющему/админу по умолчанию не показываем чужие черновики
+        # (они приватны автору до подтверждения)
+        query = query.filter(WriteOff.status != STATUS_DRAFT)
 
     # Фильтр по точке
     store_id = request.args.get('store_id', type=int)
@@ -287,12 +428,14 @@ def stats():
         query = query.filter(WriteOff.author_id == user.id)
 
     counts = dict(query.group_by(WriteOff.status).all())
+    draft = counts.get(STATUS_DRAFT, 0)
     pending = counts.get(STATUS_PENDING, 0)
     approved = counts.get(STATUS_APPROVED, 0)
     rejected = counts.get(STATUS_REJECTED, 0)
     return jsonify({
+        'draft': draft,        # черновики (ожидают подтверждения сотрудником)
         'pending': pending,
         'approved': approved,
         'rejected': rejected,
-        'total': pending + approved + rejected,
+        'total': draft + pending + approved + rejected,
     })

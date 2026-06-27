@@ -1,0 +1,14 @@
+# ML-зависимости (детектор + классификатор + детекция падений)
+ultralytics>=8.3
+supervision>=0.29
+opencv-python>=4.10
+numpy>=1.26
+Pillow>=10
+PyYAML>=6
+requests>=2.31        # HTTP-мост к бэкенду (backend_client.py)
+roboflow>=1.1          # скачивание датасетов (dataset_merge / state_classifier_dataset)
+
+# torch / torchvision НЕ ставить отсюда — для GPU нужна CUDA-сборка:
+#   pip install --index-url https://download.pytorch.org/whl/cu126 \
+#       torch==2.12.1+cu126 torchvision==0.27.1+cu126
+# (см. ml/train.py: pick_device)

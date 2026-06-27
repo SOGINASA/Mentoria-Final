@@ -19,6 +19,12 @@ export function createWriteOff(payload) {
   return api.post('/write-offs', payload);
 }
 
+// Подтверждение авто-черновика (падение) → заявка уходит проверяющему (pending).
+// payload (опц.): { comment, type, deduction_employee_id }
+export function confirmDraft(id, payload = {}) {
+  return api.post(`/write-offs/${id}/confirm`, payload);
+}
+
 export function approveWriteOff(id) {
   return api.post(`/write-offs/${id}/approve`);
 }

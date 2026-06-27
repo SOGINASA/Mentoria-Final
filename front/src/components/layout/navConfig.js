@@ -9,6 +9,7 @@ export function useNavItems() {
   const { t } = useI18n();
   const role = useAuthStore((s) => s.user?.role);
   const pendingCount = useWriteOffStore((s) => s.stats.pending);
+  const draftCount = useWriteOffStore((s) => s.stats.draft);
 
   if (role === ROLE_ADMIN) {
     return [
@@ -27,7 +28,7 @@ export function useNavItems() {
   return [
     { to: '/', label: t.nav_home, icon: 'home', match: ['/'], exact: true },
     { to: '/create', label: t.nav_create, icon: 'plus', match: ['/create'] },
-    { to: '/my-requests', label: t.nav_my, icon: 'list', match: ['/my-requests'] },
+    { to: '/my-requests', label: t.nav_my, icon: 'list', badge: draftCount, match: ['/my-requests'] },
     { to: '/profile', label: t.nav_profile, icon: 'user', match: ['/profile'] },
   ];
 }
@@ -55,6 +56,7 @@ export function useHeaderMeta() {
     { test: (p) => p.startsWith('/review/') , title: t.nav_queue, back: true },
     { test: (p) => p === '/review', title: t.nav_queue },
     { test: (p) => p === '/admin', title: t.nav_admin },
+    { test: (p) => p === '/notifications', title: t.notifications, back: true },
     { test: (p) => p === '/profile', title: t.nav_profile },
   ];
   const found = titleMap.find((m) => m.test(pathname));

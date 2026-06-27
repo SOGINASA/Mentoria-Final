@@ -40,6 +40,23 @@ export default function SenderHomePage() {
         )}
       </div>
 
+      {stats.draft > 0 && (
+        <button
+          onClick={() => navigate('/my-requests')}
+          className="w-full flex items-center gap-3 rounded-2xl p-3.5 mb-4 text-left cursor-pointer hover:-translate-y-0.5 transition"
+          style={{ background: 'var(--amber-tint)', border: '1px solid var(--amber)' }}
+        >
+          <span className="w-10 h-10 rounded-xl grid place-items-center flex-none text-white" style={{ background: 'var(--amber)' }}>
+            <Icon name="bell" size={20} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-[14px] text-text">{t.draft_alert_title}</div>
+            <div className="text-[12.5px] text-muted">{t.draft_alert_sub.replace('{n}', stats.draft)}</div>
+          </div>
+          <Icon name="chevronRight" size={18} strokeWidth={2.2} className="text-faint flex-none" />
+        </button>
+      )}
+
       <div className="flex gap-5 items-start flex-wrap">
         {/* левая колонка: счётчики + CTA */}
         <div className="flex-1 min-w-[280px] flex flex-col gap-3.5">

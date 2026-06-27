@@ -35,12 +35,13 @@ def create_app(config_object=None):
         db.create_all()
 
     # Blueprints
-    from routes import auth_bp, stores_bp, writeoffs_bp, uploads_bp, admin_bp
+    from routes import auth_bp, stores_bp, writeoffs_bp, uploads_bp, admin_bp, notifications_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(stores_bp, url_prefix='/api/stores')
     app.register_blueprint(writeoffs_bp, url_prefix='/api/write-offs')
     app.register_blueprint(uploads_bp, url_prefix='/api/uploads')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
 
     _register_misc_routes(app)
     _register_error_handlers(app)
@@ -62,6 +63,7 @@ def _register_misc_routes(app):
                 'write_offs': '/api/write-offs — заявки на списание',
                 'uploads': '/api/uploads/photo — загрузка фото',
                 'admin': '/api/admin — управление пользователями/точками/сотрудниками',
+                'notifications': '/api/notifications — лента уведомлений (падения/проверка)',
             },
         })
 

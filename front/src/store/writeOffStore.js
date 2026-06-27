@@ -9,8 +9,8 @@ export const useWriteOffStore = create((set, get) => ({
   listLoading: false,
   listError: null,
 
-  // счётчики
-  stats: { pending: 0, approved: 0, rejected: 0, total: 0 },
+  // счётчики (draft — авто-черновики, ждут подтверждения сотрудником)
+  stats: { draft: 0, pending: 0, approved: 0, rejected: 0, total: 0 },
 
   // деталь
   current: null,
@@ -57,6 +57,17 @@ export const useWriteOffStore = create((set, get) => ({
     set({ acting: true });
     try {
       const data = await woApi.createWriteOff(payload);
+      return data.write_off;
+    } finally {
+      set({ acting: false });
+    }
+  },
+
+  async confirmDraft(id, payload = {}) {
+    set({ acting: true });
+    try {
+      const data = await woApi.confirmDraft(id, payload);
+      set({ current: data.write_off });
       return data.write_off;
     } finally {
       set({ acting: false });
