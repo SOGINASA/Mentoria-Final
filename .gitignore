@@ -31,3 +31,5 @@ yarn-error.log*
 # --- Misc ---
 coverage/
 .cache/
+
+task.txt
