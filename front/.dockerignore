@@ -6,6 +6,7 @@ coverage
 .dockerignore
 Dockerfile
 npm-debug.log*
-.env
-.env.local
 .DS_Store
+# .env НЕ исключаем — CRA читает его при сборке (REACT_APP_API_URL).
+# .env.host — это шаблон, в образ не нужен:
+.env.host
