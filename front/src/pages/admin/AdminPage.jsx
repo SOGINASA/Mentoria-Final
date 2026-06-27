@@ -7,8 +7,7 @@ import BottomSheet from '../../components/ui/BottomSheet';
 import { useI18n } from '../../i18n/useI18n';
 import { useUiStore } from '../../store/uiStore';
 import * as adminApi from '../../api/admin.api';
-import { getStores, getEmployees } from '../../api/stores.api';
-import { listUsers } from '../../api/admin.api';
+import { listUsers, listStores, listEmployees } from '../../api/admin.api';
 import { initials } from '../../utils/format';
 import { ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN } from '../../constants/roles';
 
@@ -32,7 +31,7 @@ export default function AdminPage() {
   const roleLabel = (r) => (r === ROLE_REVIEWER ? t.role_reviewer : r === ROLE_ADMIN ? t.role_admin : t.role_sender);
 
   const loadStores = useCallback(async () => {
-    const d = await getStores();
+    const d = await listStores();
     setStores(d.stores || []);
   }, []);
 
@@ -40,8 +39,8 @@ export default function AdminPage() {
     setLoading(true);
     try {
       if (tab === 'users') setUsers((await listUsers()).users || []);
-      if (tab === 'stores') setStores((await getStores()).stores || []);
-      if (tab === 'employees') setEmployees((await getEmployees()).employees || []);
+      if (tab === 'stores') setStores((await listStores()).stores || []);
+      if (tab === 'employees') setEmployees((await listEmployees()).employees || []);
     } catch (e) {
       showToast(e.message || t.error_toast);
     } finally {
@@ -223,12 +222,14 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
         name: entity?.name || '',
         address: entity?.address || '',
         iiko_store_id: entity?.iiko_store_id || '',
+        is_active: entity ? entity.is_active : true,
       };
     return {
       full_name: entity?.full_name || '',
       position: entity?.position || '',
       store_id: entity?.store_id || '',
       iiko_employee_id: entity?.iiko_employee_id || '',
+      is_active: entity ? entity.is_active : true,
     };
   });
 
@@ -253,7 +254,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
         else await adminApi.createUser({ ...payload, username: form.username, password: form.password });
       } else if (tab === 'stores') {
         const payload = { name: form.name, address: form.address, iiko_store_id: form.iiko_store_id };
-        if (isEdit) await adminApi.updateStore(entity.id, payload);
+        if (isEdit) await adminApi.updateStore(entity.id, { ...payload, is_active: form.is_active });
         else await adminApi.createStore(payload);
       } else {
         const payload = {
@@ -262,7 +263,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
           store_id: storeId,
           iiko_employee_id: form.iiko_employee_id,
         };
-        if (isEdit) await adminApi.updateEmployee(entity.id, payload);
+        if (isEdit) await adminApi.updateEmployee(entity.id, { ...payload, is_active: form.is_active });
         else await adminApi.createEmployee(payload);
       }
       showToast(t.save);
@@ -327,12 +328,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
             {storeOptions}
             <Field label={t.f_email} value={form.email} onChange={set('email')} />
             <Field label={t.f_phone} value={form.phone} onChange={set('phone')} />
-            {isEdit && (
-              <label className="flex items-center gap-2.5 cursor-pointer mt-1">
-                <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} className="w-4 h-4 accent-[var(--green)]" />
-                <span className="text-sm text-text">{t.admin_active}</span>
-              </label>
-            )}
+            {isEdit && <ActiveToggle label={t.admin_active} checked={form.is_active} onChange={(v) => setForm((f) => ({ ...f, is_active: v }))} />}
           </>
         )}
 
@@ -341,6 +337,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
             <Field label={t.f_name} value={form.name} onChange={set('name')} />
             <Field label={t.f_address} value={form.address} onChange={set('address')} />
             <Field label={t.f_iiko_store} value={form.iiko_store_id} onChange={set('iiko_store_id')} />
+            {isEdit && <ActiveToggle label={t.admin_active} checked={form.is_active} onChange={(v) => setForm((f) => ({ ...f, is_active: v }))} />}
           </>
         )}
 
@@ -350,6 +347,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
             <Field label={t.f_position} value={form.position} onChange={set('position')} />
             {storeOptions}
             <Field label={t.f_iiko_emp} value={form.iiko_employee_id} onChange={set('iiko_employee_id')} />
+            {isEdit && <ActiveToggle label={t.admin_active} checked={form.is_active} onChange={(v) => setForm((f) => ({ ...f, is_active: v }))} />}
           </>
         )}
       </div>
@@ -377,6 +375,20 @@ function Field({ label, value, onChange, type = 'text', hint }) {
         className="h-12 bg-surface border-[1.5px] border-line rounded-xl px-3.5 outline-none text-[15px] text-text focus:border-green transition-colors"
       />
       {hint && <span className="text-[11.5px] text-faint">{hint}</span>}
+    </label>
+  );
+}
+
+function ActiveToggle({ label, checked, onChange }) {
+  return (
+    <label className="flex items-center gap-2.5 cursor-pointer mt-1">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="w-4 h-4 accent-[var(--green)]"
+      />
+      <span className="text-sm text-text">{label}</span>
     </label>
   );
 }

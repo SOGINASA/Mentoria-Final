@@ -20,6 +20,10 @@ export function deactivateUser(id) {
 }
 
 // --- Точки ---
+// Все точки, включая деактивированные (для управления в админке).
+export function listStores() {
+  return api.get('/admin/stores');
+}
 export function createStore(payload) {
   return api.post('/admin/stores', payload);
 }
@@ -31,6 +35,10 @@ export function deactivateStore(id) {
 }
 
 // --- Сотрудники ---
+// Все сотрудники, включая деактивированных (для управления в админке).
+export function listEmployees(storeId) {
+  return api.get(`/admin/employees${storeId ? `?store_id=${storeId}` : ''}`);
+}
 export function createEmployee(payload) {
   return api.post('/admin/employees', payload);
 }
