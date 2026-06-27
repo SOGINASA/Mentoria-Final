@@ -61,6 +61,10 @@ class DevelopmentConfig(Config):
     DEBUG = True
 
 
+class ProductionConfig(Config):
+    DEBUG = False
+
+
 class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
@@ -70,10 +74,12 @@ class TestingConfig(Config):
 
 config = {
     'development': DevelopmentConfig,
+    'production': ProductionConfig,
     'testing': TestingConfig,
     'default': DevelopmentConfig,
 }
 
 
 def get_config():
-    return config[os.environ.get('FLASK_ENV') or 'default']
+    # .get с фолбэком, чтобы любое неизвестное значение FLASK_ENV не ломало старт
+    return config.get(os.environ.get('FLASK_ENV') or 'default', DevelopmentConfig)

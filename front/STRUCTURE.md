@@ -1,100 +1,76 @@
-# Front — файловая структура
+# Front — структура (реализовано)
 
 Стек: **Create React App** + **Tailwind CSS** + **Zustand** + **React Router**.
-Подход: **mobile-first** (базовые стили — под телефон, `md:`/`lg:` — расширение под десктоп).
+Подход: **mobile-first** (базовые стили — телефон, `md:`/`lg:` — десктоп).
+Дизайн перенесён из макета **Bahandi** (`design/`), данные — с реального API (`back/`, без моков).
 
 ```
 front/
-├── public/
-│   └── index.html
+├── .env                         # REACT_APP_API_URL (адрес бэкенда)
+├── tailwind.config.js           # дизайн-токены: цвета → CSS-переменные, шрифты Oswald/Onest
 ├── src/
-│   ├── index.js                 # точка входа, маунт <App/>
-│   ├── index.css                # подключение Tailwind (@tailwind base/components/utilities)
-│   ├── App.js                   # корневой компонент: провайдеры + роутер
+│   ├── index.css                # @tailwind + CSS-переменные светлой/тёмной темы (токены Bahandi)
+│   ├── index.js                 # точка входа
+│   ├── App.js                   # инициализация темы + сессии, BrowserRouter
 │   │
-│   ├── routes/                  # маршрутизация
-│   │   ├── AppRouter.jsx        # карта всех маршрутов
-│   │   └── ProtectedRoute.jsx   # доступ по роли (отправитель / проверяющий)
+│   ├── routes/
+│   │   ├── AppRouter.jsx         # карта маршрутов
+│   │   └── guards.jsx            # RequireAuth / RequireRole / GuestOnly
 │   │
-│   ├── pages/                   # экраны (по ролям)
-│   │   ├── auth/
-│   │   │   └── LoginPage.jsx            # вход (индивидуальный доступ)
-│   │   ├── sender/                      # роль «Отправитель»
-│   │   │   ├── SenderHomePage.jsx       # главная отправителя
-│   │   │   ├── CreateWriteOffPage.jsx   # форма создания заявки (мастер по шагам)
-│   │   │   ├── MyRequestsPage.jsx       # мои заявки / история
-│   │   │   └── RequestDetailPage.jsx    # детально по своей заявке (статус)
-│   │   ├── reviewer/                     # роль «Проверяющий»
-│   │   │   ├── ReviewQueuePage.jsx      # очередь заявок на проверку
-│   │   │   ├── ReviewDetailPage.jsx     # проверка заявки: фото + инфо + решение
-│   │   │   └── ReviewHistoryPage.jsx    # история обработанных заявок
-│   │   └── common/
-│   │       ├── ProfilePage.jsx          # профиль / выход
-│   │       └── NotFoundPage.jsx         # 404
+│   ├── pages/
+│   │   ├── auth/LoginPage.jsx              # вход (реальный /auth/login + демо-кнопки)
+│   │   ├── sender/SenderHomePage.jsx       # главная: счётчики + CTA + последние заявки
+│   │   ├── sender/CreateWriteOffPage.jsx   # мастер: фото→точка→тип→[сотрудник]→комментарий+сводка
+│   │   ├── sender/MyRequestsPage.jsx       # мои заявки (табы статусов)
+│   │   ├── sender/RequestDetailPage.jsx    # деталь заявки + таймлайн
+│   │   ├── reviewer/ReviewQueuePage.jsx    # очередь на проверку
+│   │   ├── reviewer/ReviewDetailPage.jsx   # проверка: фото+данные, подтвердить/отклонить, статус iiko
+│   │   ├── reviewer/ReviewHistoryPage.jsx  # история обработанных
+│   │   └── common/{ProfilePage,NotFoundPage}.jsx
 │   │
 │   ├── components/
-│   │   ├── layout/              # каркас интерфейса
-│   │   │   ├── AppShell.jsx     # обёртка: контент + навигация (адаптив)
-│   │   │   ├── Header.jsx       # верхняя панель (заголовок, профиль)
-│   │   │   ├── BottomNav.jsx    # нижняя навигация (мобайл, основной способ навигации)
-│   │   │   └── Sidebar.jsx      # боковое меню (десктоп)
-│   │   └── ui/                  # переиспользуемые элементы
-│   │       ├── Button.jsx
-│   │       ├── Input.jsx
-│   │       ├── Textarea.jsx     # комментарий (со счётчиком символов)
-│   │       ├── Select.jsx       # выбор точки / сотрудника
-│   │       ├── PhotoUpload.jsx  # съёмка/загрузка фото + превью
-│   │       ├── Modal.jsx        # подтверждения (одобрить/отклонить)
-│   │       ├── StatusBadge.jsx  # статус заявки (на проверке/одобрена/отклонена)
-│   │       ├── Card.jsx         # карточка заявки в списке
-│   │       ├── Spinner.jsx
-│   │       └── EmptyState.jsx   # пустые списки
+│   │   ├── layout/   AppShell · Header · Sidebar (десктоп) · BottomNav (мобайл) · navConfig
+│   │   ├── ui/       Logo · Icon · Button · Spinner · Tabs · StatusBadge · TypeBadge ·
+│   │   │             PhotoTile · RequestCard · EmptyState · Toast · BottomSheet
+│   │   └── writeoff/ BigPhoto (зум) · InfoCard · Timeline
 │   │
-│   ├── store/                   # Zustand-стораджи
-│   │   ├── authStore.js         # пользователь, роль, токен, login/logout
-│   │   ├── writeOffStore.js     # заявки: создание, список, фильтры, действия
-│   │   └── uiStore.js           # модалки, тосты, состояние навигации
-│   │
-│   ├── api/                     # слой данных (общение с back)
-│   │   ├── client.js            # базовый HTTP-клиент
-│   │   ├── auth.api.js
-│   │   ├── writeOffs.api.js
-│   │   └── stores.api.js        # точки и сотрудники
-│   │
-│   ├── constants/
-│   │   ├── roles.js             # SENDER / REVIEWER
-│   │   ├── statuses.js          # PENDING / APPROVED / REJECTED
-│   │   └── writeOffTypes.js     # без удержания / с удержанием
-│   │
-│   ├── hooks/                   # кастомные хуки
-│   ├── utils/                   # форматтеры, валидация (мин. 10 символов и т.п.)
-│   └── assets/                  # иконки, картинки
-├── tailwind.config.js          # дизайн-токены (заполняется на этапе дизайна)
-├── postcss.config.js
-├── DESIGN-SPEC.md              # постраничное описание для дизайна
-└── STRUCTURE.md                # этот файл
+│   ├── store/        authStore · uiStore (тема/язык/тост) · writeOffStore   (Zustand)
+│   ├── api/          client (JWT + авто-refresh) · auth · stores · writeOffs · uploads
+│   ├── i18n/         translations (RU/KZ) · useI18n
+│   ├── constants/    roles · statuses · writeOffTypes · iiko
+│   └── utils/        format (даты, инициалы)
 ```
 
-## Принципы
+## Что реализовано из ТЗ (через реальный API)
 
-- **Mobile-first.** Верстаем сначала под телефон, через `md:` / `lg:` адаптируем под десктоп.
-  Навигация: на мобиле — нижний таб-бар (`BottomNav`), на десктопе — боковое меню (`Sidebar`).
-- **Разделение по ролям.** `pages/sender` и `pages/reviewer` строго разделены, доступ — через
-  `ProtectedRoute` по роли из `authStore`.
-- **Состояние — в Zustand.** UI-компоненты «тупые», логика и данные — в стораджах.
-- **`api/` изолирует back.** Компоненты не знают про эндпоинты; всё через слой `api`.
+- Вход по индивидуальному доступу — `POST /api/auth/login` (JWT, авто-refresh).
+- Создание заявки: загрузка фото `POST /api/uploads/photo` → `POST /api/write-offs`
+  (точка, тип, сотрудник при удержании, комментарий ≥10 символов).
+- Списки и история — `GET /api/write-offs` с фильтрами по статусу.
+- Проверка: `POST /api/write-offs/:id/approve` (создаёт акт в iiko) и `/reject`.
+- Счётчики — `GET /api/write-offs/stats`. Справочники — `GET /api/stores`, сотрудники точки.
 
-## Маршруты (карта)
+## Маршруты
 
-| Путь                     | Страница             | Роль         |
-|--------------------------|----------------------|--------------|
-| `/login`                 | LoginPage            | гость        |
-| `/`                      | SenderHomePage       | отправитель  |
-| `/create`                | CreateWriteOffPage   | отправитель  |
-| `/my-requests`           | MyRequestsPage       | отправитель  |
-| `/my-requests/:id`       | RequestDetailPage    | отправитель  |
-| `/review`                | ReviewQueuePage      | проверяющий  |
-| `/review/:id`            | ReviewDetailPage     | проверяющий  |
-| `/review/history`        | ReviewHistoryPage    | проверяющий  |
-| `/profile`               | ProfilePage          | любой        |
-| `*`                      | NotFoundPage         | любой        |
+| Путь | Страница | Роль |
+|------|----------|------|
+| `/login` | LoginPage | гость |
+| `/` · `/create` · `/my-requests` · `/my-requests/:id` | экраны отправителя | sender |
+| `/review` · `/review/history` · `/review/:id` | экраны проверяющего | reviewer / admin |
+| `/profile` | ProfilePage | любой |
+| `*` | NotFoundPage | — |
+
+## Особенности дизайна
+
+- Темы **светлая/тёмная** (`data-theme` на `<html>`), переключатель в профиле и на входе.
+- Язык **RU/KZ** (i18n), переключается в профиле/на входе. Сохраняются в localStorage.
+- Шрифты: **Oswald** (заголовки) + **Onest** (текст). Логотип BAHANDI.
+- Цвета статусов едины: 🟡 на проверке · 🟢 подтверждена · 🔴 отклонена.
+
+## Запуск
+
+```bash
+# 1) бэкенд (см. back/README.md): flask --app app init-db && python app.py  → :5252
+# 2) фронт:
+cd front && npm install && npm start                                        → :3000
+```

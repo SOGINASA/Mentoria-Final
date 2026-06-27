@@ -1,0 +1,12 @@
+node_modules
+build
+coverage
+.git
+.gitignore
+.dockerignore
+Dockerfile
+npm-debug.log*
+.DS_Store
+# .env НЕ исключаем — CRA читает его при сборке (REACT_APP_API_URL).
+# .env.host — это шаблон, в образ не нужен:
+.env.host

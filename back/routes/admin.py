@@ -111,6 +111,14 @@ def delete_user(user_id):
 
 
 # ============================ ТОЧКИ ======================================= #
+@admin_bp.route('/stores', methods=['GET'])
+@role_required(ROLE_ADMIN)
+def list_stores_admin():
+    """Все точки, включая деактивированные (для управления в админке)."""
+    stores = Store.query.order_by(Store.is_active.desc(), Store.name).all()
+    return jsonify({'stores': [s.to_dict() for s in stores]})
+
+
 @admin_bp.route('/stores', methods=['POST'])
 @role_required(ROLE_ADMIN)
 def create_store():
@@ -159,6 +167,18 @@ def delete_store(store_id):
 
 
 # ============================ СОТРУДНИКИ ================================== #
+@admin_bp.route('/employees', methods=['GET'])
+@role_required(ROLE_ADMIN)
+def list_employees_admin():
+    """Все сотрудники, включая деактивированных; опционально ?store_id=."""
+    query = Employee.query
+    store_id = request.args.get('store_id', type=int)
+    if store_id:
+        query = query.filter_by(store_id=store_id)
+    employees = query.order_by(Employee.is_active.desc(), Employee.full_name).all()
+    return jsonify({'employees': [e.to_dict() for e in employees]})
+
+
 @admin_bp.route('/employees', methods=['POST'])
 @role_required(ROLE_ADMIN)
 def create_employee():

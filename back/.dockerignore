@@ -1,0 +1,23 @@
+# Виртуальные окружения (Windows-бинарники не нужны в linux-образе)
+.venv
+venv
+env
+
+# Python-кэш
+__pycache__
+*.py[cod]
+.pytest_cache
+
+# Локальная БД и загрузки (монтируются как volume в рантайме)
+database/*.db
+database/*.sqlite3
+static/uploads/*
+
+# Окружение и git
+.env
+.git
+.gitignore
+.dockerignore
+
+# Тесты в образе не нужны
+tests
