@@ -8,11 +8,9 @@ RUN npm ci
 
 COPY . .
 
-# Адрес публичного HTTPS API бэка. CRA читает REACT_APP_* в build-time и
-# вшивает значение в бандл. Бэк и фронт стоят на разных хостах, поэтому это
-# полный внешний URL (напр. https://api.example.com), а не localhost.
-ARG REACT_APP_API_URL
-ENV REACT_APP_API_URL=$REACT_APP_API_URL
+# REACT_APP_API_URL берётся из front/.env (CRA читает .env при сборке и вшивает
+# значение в бандл). Бэк и фронт на разных хостах, поэтому там полный внешний
+# URL API (напр. https://api.example.com). Меняется в front/.env -> пересборка.
 RUN npm run build
 
 # --- Этап раздачи: лёгкий статик-сервер (без nginx) ---

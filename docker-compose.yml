@@ -18,7 +18,7 @@ services:
     ports:
       - "5252:5252"
     env_file:
-      - .env
+      - ./back/.env
     volumes:
       - ./back/database:/app/database
       - ./back/static/uploads:/app/static/uploads
@@ -34,9 +34,6 @@ services:
     build:
       context: ./front
       dockerfile: Dockerfile
-      args:
-        # build-time переменная CRA, значение берётся из .env
-        REACT_APP_API_URL: ${REACT_APP_API_URL}
     container_name: writeoff-frontend
     ports:
       - "3000:3000"
