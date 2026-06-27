@@ -3,7 +3,7 @@
 черновик, проверяющим — новая заявка ожидает проверки."""
 
 from models import db, User, Notification
-from constants import ROLE_REVIEWER
+from constants import ROLE_REVIEWER, ROLE_ADMIN
 
 
 def notify(user_id, kind, title, body=None, write_off_id=None, commit=True):
@@ -19,10 +19,20 @@ def notify(user_id, kind, title, body=None, write_off_id=None, commit=True):
 
 def notify_reviewers(kind, title, body=None, write_off_id=None, commit=True):
     """Создать уведомление для всех активных проверяющих."""
-    reviewers = User.query.filter_by(role=ROLE_REVIEWER, is_active=True).all()
+    return _notify_role(ROLE_REVIEWER, kind, title, body, write_off_id, commit)
+
+
+def notify_admins(kind, title, body=None, write_off_id=None, commit=True):
+    """Создать уведомление для всех активных администраторов."""
+    return _notify_role(ROLE_ADMIN, kind, title, body, write_off_id, commit)
+
+
+def _notify_role(role, kind, title, body, write_off_id, commit):
+    """Уведомить всех активных пользователей указанной роли."""
+    recipients = User.query.filter_by(role=role, is_active=True).all()
     created = [
-        notify(r.id, kind, title, body=body, write_off_id=write_off_id, commit=False)
-        for r in reviewers
+        notify(u.id, kind, title, body=body, write_off_id=write_off_id, commit=False)
+        for u in recipients
     ]
     if commit:
         db.session.commit()

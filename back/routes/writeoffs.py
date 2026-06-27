@@ -13,13 +13,13 @@ from utils.validators import parse_date
 from utils.request_helpers import get_pagination
 from utils.uploads import save_image_file
 from services import iiko_service
-from services.notifications import notify, notify_reviewers
+from services.notifications import notify, notify_reviewers, notify_admins
 from constants import (
     ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN,
     STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUSES,
     TYPE_NO_DEDUCTION, TYPE_WITH_DEDUCTION, WRITEOFF_TYPES,
     SOURCE_MANUAL, SOURCE_AUTO_FALL,
-    NOTIFY_FALL_DRAFT, NOTIFY_REVIEW_PENDING,
+    NOTIFY_FALL_DRAFT, NOTIFY_FALL_ALERT, NOTIFY_REVIEW_PENDING,
     IIKO_PENDING, IIKO_SYNCED, IIKO_FAILED, MIN_COMMENT_LENGTH,
 )
 
@@ -182,6 +182,15 @@ def create_fall_draft():
             body=f'{product_ru}: {reason}. Подтвердите черновик списания.',
             write_off_id=wo.id, commit=False,
         )
+
+        # Надзорное уведомление: админ + проверяющий узнают о падении сразу,
+        # не дожидаясь подтверждения сотрудником (контроль жалоб на поваров).
+        store_name = user.store.name if user.store else 'Точка'
+        alert_body = f'{store_name}: {product_ru} — {reason}'
+        notify_admins(NOTIFY_FALL_ALERT, title='Зафиксировано падение продукта',
+                      body=alert_body, write_off_id=wo.id, commit=False)
+        notify_reviewers(NOTIFY_FALL_ALERT, title='Зафиксировано падение продукта',
+                         body=alert_body, write_off_id=wo.id, commit=False)
 
         db.session.commit()
         return jsonify({'write_off': wo.to_dict()}), 201

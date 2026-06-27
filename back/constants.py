@@ -26,8 +26,9 @@ WRITEOFF_TYPES = {TYPE_NO_DEDUCTION, TYPE_WITH_DEDUCTION}
 
 # Виды уведомлений (лента для polling)
 NOTIFY_FALL_DRAFT = 'fall_draft'          # сотруднику: зафиксировано падение → подтвердите черновик
+NOTIFY_FALL_ALERT = 'fall_alert'          # админу/проверяющему: на точке зафиксировано падение (надзор)
 NOTIFY_REVIEW_PENDING = 'review_pending'  # проверяющему: новая заявка ожидает проверки
-NOTIFY_KINDS = {NOTIFY_FALL_DRAFT, NOTIFY_REVIEW_PENDING}
+NOTIFY_KINDS = {NOTIFY_FALL_DRAFT, NOTIFY_FALL_ALERT, NOTIFY_REVIEW_PENDING}
 
 # Статус синхронизации с Iiko
 IIKO_NONE = 'none'        # Ещё не отправлялось

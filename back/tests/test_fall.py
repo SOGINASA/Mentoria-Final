@@ -66,6 +66,19 @@ def test_sender_sees_own_draft(client, app, sender, store, auth, tmp_path):
     assert resp.get_json()['write_offs'][0]['status'] == 'draft'
 
 
+def test_auto_fall_alerts_admin_and_reviewer(client, app, sender, reviewer, admin, store, auth, tmp_path):
+    """Падение сразу уведомляет админа и проверяющего (надзор), не дожидаясь
+    подтверждения сотрудником."""
+    _post_fall(client, app, auth(sender), tmp_path)
+
+    for user in (reviewer, admin):
+        notes = client.get('/api/notifications?unread=1', headers=auth(user)).get_json()
+        assert notes['unread'] == 1, user.username
+        assert notes['notifications'][0]['kind'] == 'fall_alert'
+        # уведомление ведёт прямо в карточку заявки
+        assert notes['notifications'][0]['write_off_id'] is not None
+
+
 def test_confirm_draft_goes_pending_and_notifies_reviewer(client, app, sender, reviewer, store, auth, tmp_path):
     wo_id = _post_fall(client, app, auth(sender), tmp_path).get_json()['write_off']['id']
 
@@ -78,8 +91,10 @@ def test_confirm_draft_goes_pending_and_notifies_reviewer(client, app, sender, r
     lst = client.get('/api/write-offs', headers=auth(reviewer))
     assert lst.get_json()['pagination']['total'] == 1
 
+    # у проверяющего теперь два уведомления: алерт о падении + заявка на проверку,
+    # самое свежее (review_pending) — сверху
     notes = client.get('/api/notifications?unread=1', headers=auth(reviewer)).get_json()
-    assert notes['unread'] == 1
+    assert notes['unread'] == 2
     assert notes['notifications'][0]['kind'] == 'review_pending'
 
 

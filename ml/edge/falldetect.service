@@ -1,0 +1,31 @@
+# systemd-юнит детектора падений для одного ларька (Linux edge-бокс).
+#
+# Установка (от root):
+#   1. Поправьте User= и пути ниже под свою машину (где лежит репозиторий).
+#   2. cp ml/edge/falldetect.service /etc/systemd/system/falldetect.service
+#   3. systemctl daemon-reload
+#   4. systemctl enable --now falldetect
+#   5. journalctl -u falldetect -f   # смотреть логи (события падений)
+#
+# Конфиг точки берётся из ml/edge/falldetect.env (рядом с run_edge.sh).
+
+[Unit]
+Description=Fall detection edge agent (kiosk camera -> backend write-off drafts)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Под каким пользователем крутить (НЕ root по возможности).
+User=falldetect
+# Абсолютный путь к репозиторию на этом боксе:
+WorkingDirectory=/opt/mentoria/ml
+ExecStart=/opt/mentoria/ml/edge/run_edge.sh
+# Перезапуск при падении процесса/обрыве камеры или сети.
+Restart=always
+RestartSec=5
+# Не зашумлять journal при быстрых перезапусках.
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target
