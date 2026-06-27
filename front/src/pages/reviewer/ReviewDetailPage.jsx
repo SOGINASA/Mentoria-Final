@@ -63,8 +63,8 @@ export default function ReviewDetailPage() {
   }
 
   return (
-    <div className="relative min-h-full">
-      <div className="p-5 pb-32 max-w-[1000px] mx-auto flex gap-6 flex-wrap">
+    <div className="min-h-full flex flex-col">
+      <div className="flex-1 w-full p-5 pb-8 max-w-[1000px] mx-auto flex gap-6 flex-wrap">
         <div className="flex-[1.1] min-w-[280px]">
           <BigPhoto photos={wo.photos} showZoom />
         </div>
@@ -119,7 +119,7 @@ export default function ReviewDetailPage() {
 
       {/* нижняя панель действий */}
       {pending && (
-        <div className="absolute left-0 right-0 bottom-0 bg-surface border-t border-line px-5 py-3.5" style={{ boxShadow: '0 -8px 24px -12px rgba(0,0,0,.2)' }}>
+        <div className="sticky bottom-0 bg-surface border-t border-line px-5 py-3.5" style={{ boxShadow: '0 -8px 24px -12px rgba(0,0,0,.2)' }}>
           <div className="max-w-[1000px] mx-auto flex gap-3">
             <button
               onClick={() => {

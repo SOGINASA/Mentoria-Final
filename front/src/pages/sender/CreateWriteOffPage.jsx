@@ -118,8 +118,8 @@ export default function CreateWriteOffPage() {
   const filteredEmps = employees.filter((e) => e.full_name.toLowerCase().includes(empQuery.toLowerCase()));
 
   return (
-    <div className="relative min-h-full">
-      <div className="p-5 pb-32 max-w-[620px] mx-auto">
+    <div className="min-h-full flex flex-col">
+      <div className="flex-1 w-full p-5 pb-8 max-w-[620px] mx-auto">
         {/* прогресс */}
         <div className="flex gap-1.5 mb-5">
           {steps.map((s, i) => (
@@ -316,7 +316,7 @@ export default function CreateWriteOffPage() {
       </div>
 
       {/* футер мастера */}
-      <div className="absolute left-0 right-0 bottom-0 border-t border-line bg-surface px-5 py-3.5">
+      <div className="sticky bottom-0 border-t border-line bg-surface px-5 py-3.5">
         <div className="max-w-[620px] mx-auto flex gap-3">
           <button onClick={prev} className="flex-none w-[54px] h-[52px] rounded-2xl border-[1.5px] border-line bg-surface text-text cursor-pointer grid place-items-center">
             <Icon name="chevronLeft" size={20} strokeWidth={2.2} />

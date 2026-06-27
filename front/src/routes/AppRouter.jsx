@@ -11,11 +11,13 @@ import RequestDetailPage from '../pages/sender/RequestDetailPage';
 import ReviewQueuePage from '../pages/reviewer/ReviewQueuePage';
 import ReviewDetailPage from '../pages/reviewer/ReviewDetailPage';
 import ReviewHistoryPage from '../pages/reviewer/ReviewHistoryPage';
+import AdminPage from '../pages/admin/AdminPage';
 import ProfilePage from '../pages/common/ProfilePage';
 import NotFoundPage from '../pages/common/NotFoundPage';
 
 const sender = (el) => <RequireRole roles={[ROLE_SENDER]}>{el}</RequireRole>;
 const reviewer = (el) => <RequireRole roles={[ROLE_REVIEWER, ROLE_ADMIN]}>{el}</RequireRole>;
+const admin = (el) => <RequireRole roles={[ROLE_ADMIN]}>{el}</RequireRole>;
 
 export default function AppRouter() {
   return (
@@ -46,6 +48,9 @@ export default function AppRouter() {
         <Route path="/review" element={reviewer(<ReviewQueuePage />)} />
         <Route path="/review/history" element={reviewer(<ReviewHistoryPage />)} />
         <Route path="/review/:id" element={reviewer(<ReviewDetailPage />)} />
+
+        {/* Администратор */}
+        <Route path="/admin" element={admin(<AdminPage />)} />
 
         {/* Общее */}
         <Route path="/profile" element={<ProfilePage />} />

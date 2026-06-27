@@ -13,7 +13,7 @@ export default function AppShell() {
       <div className="flex-1 min-w-0 flex flex-col">
         <Header />
         <main className="flex-1 min-h-0 overflow-auto relative">
-          <div key={pathname} className="animate-screenIn min-h-full">
+          <div key={pathname} className="animate-screenIn h-full">
             <Outlet />
           </div>
         </main>

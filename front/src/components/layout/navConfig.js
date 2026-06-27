@@ -10,7 +10,14 @@ export function useNavItems() {
   const role = useAuthStore((s) => s.user?.role);
   const pendingCount = useWriteOffStore((s) => s.stats.pending);
 
-  if (role === ROLE_REVIEWER || role === ROLE_ADMIN) {
+  if (role === ROLE_ADMIN) {
+    return [
+      { to: '/admin', label: t.nav_admin, icon: 'sliders', match: ['/admin'] },
+      { to: '/review', label: t.nav_queue, icon: 'queue', badge: pendingCount, match: ['/review'], exclude: ['/review/history'] },
+      { to: '/profile', label: t.nav_profile, icon: 'user', match: ['/profile'] },
+    ];
+  }
+  if (role === ROLE_REVIEWER) {
     return [
       { to: '/review', label: t.nav_queue, icon: 'queue', badge: pendingCount, match: ['/review'], exclude: ['/review/history'] },
       { to: '/review/history', label: t.nav_history, icon: 'history', match: ['/review/history'] },
@@ -47,6 +54,7 @@ export function useHeaderMeta() {
     { test: (p) => p === '/review/history', title: t.nav_history },
     { test: (p) => p.startsWith('/review/') , title: t.nav_queue, back: true },
     { test: (p) => p === '/review', title: t.nav_queue },
+    { test: (p) => p === '/admin', title: t.nav_admin },
     { test: (p) => p === '/profile', title: t.nav_profile },
   ];
   const found = titleMap.find((m) => m.test(pathname));

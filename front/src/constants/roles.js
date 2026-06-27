@@ -7,5 +7,5 @@ export const ROLE_ADMIN = 'admin'; // Администратор
 export const HOME_ROUTE_BY_ROLE = {
   [ROLE_SENDER]: '/',
   [ROLE_REVIEWER]: '/review',
-  [ROLE_ADMIN]: '/review',
+  [ROLE_ADMIN]: '/admin',
 };

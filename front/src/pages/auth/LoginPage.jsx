@@ -12,6 +12,7 @@ import { HOME_ROUTE_BY_ROLE } from '../../constants/roles';
 const DEMO = {
   sender: { identifier: 'sender1', password: 'sender123' },
   reviewer: { identifier: 'reviewer', password: 'reviewer123' },
+  admin: { identifier: 'admin', password: 'admin12345' },
 };
 
 export default function LoginPage() {
@@ -135,20 +136,27 @@ export default function LoginPage() {
               <span className="flex-1 h-px bg-line" />
             </div>
 
-            <div className="flex gap-2.5">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => submit(DEMO.sender)}
-                className="flex-1 h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[13px] cursor-pointer hover:border-green transition-colors"
+                className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
               >
                 {t.role_sender}
               </button>
               <button
                 type="button"
                 onClick={() => submit(DEMO.reviewer)}
-                className="flex-1 h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[13px] cursor-pointer hover:border-green transition-colors"
+                className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
               >
                 {t.role_reviewer}
+              </button>
+              <button
+                type="button"
+                onClick={() => submit(DEMO.admin)}
+                className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
+              >
+                {t.role_admin}
               </button>
             </div>
           </form>
