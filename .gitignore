@@ -33,3 +33,14 @@ coverage/
 .cache/
 
 task.txt
+
+.venv
+
+ml/raw_datasets
+ml/unified_writeoff_dataset
+ml/raw_state_datasets
+ml/state_classifier_dataset
+ml/__pycache__
+ml/yolo26n.pt
+ml/yolov8n.pt
+ml/yolov8n-cls.pt
