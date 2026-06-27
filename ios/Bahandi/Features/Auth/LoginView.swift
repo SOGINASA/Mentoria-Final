@@ -12,7 +12,7 @@ struct LoginView: View {
     private let demo: [(String, String, String)] = [
         ("role_sender", "sender1", "sender123"),
         ("role_reviewer", "reviewer", "reviewer123"),
-        ("role_admin", "admin", "admin12345"),
+        ("role_admin", "admin", "admin123"),
     ]
 
     var body: some View {

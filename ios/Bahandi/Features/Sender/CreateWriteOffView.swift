@@ -7,8 +7,11 @@ struct CreateWriteOffView: View {
     @EnvironmentObject var store: WriteOffStore
     @Environment(\.dismiss) private var dismiss
 
+    // Загруженное фото + результат распознавания ИИ
+    struct UploadedPhoto: Identifiable { var id: String { url }; let url: String; let recognition: Recognition? }
+
     @State private var stepIndex = 0
-    @State private var urls: [String] = []
+    @State private var photos: [UploadedPhoto] = []
     @State private var uploading = false
     @State private var storeId: Int?
     @State private var wtype = ""
@@ -35,7 +38,7 @@ struct CreateWriteOffView: View {
 
     private var valid: Bool {
         switch cur {
-        case "photo": return !urls.isEmpty
+        case "photo": return !photos.isEmpty
         case "point": return storeId != nil
         case "type": return !wtype.isEmpty
         case "employee": return employeeId != nil
@@ -81,7 +84,7 @@ struct CreateWriteOffView: View {
         .onChange(of: pickerItems) { _, items in
             Task {
                 for item in items {
-                    if urls.count >= maxPhotos { break }
+                    if photos.count >= maxPhotos { break }
                     if let data = try? await item.loadTransferable(type: Data.self) { await upload(data) }
                 }
                 pickerItems = []
@@ -107,22 +110,29 @@ struct CreateWriteOffView: View {
         }
     }
 
+    // Сводный вердикт ИИ по всем фото: «плохие» позиции вперёд.
+    private var aiItems: [DetectedItem] {
+        photos.flatMap { $0.recognition?.detectedItems ?? [] }
+            .sorted { ($0.requiresWriteoff ? 1 : 0, $0.confidence) > ($1.requiresWriteoff ? 1 : 0, $1.confidence) }
+    }
+    private var aiNeedsWriteoff: Bool { aiItems.contains { $0.requiresWriteoff } }
+
     private var photoStep: some View {
         VStack(spacing: 14) {
             let cols = [GridItem(.adaptive(minimum: 104), spacing: 11)]
             LazyVGrid(columns: cols, spacing: 11) {
-                ForEach(urls, id: \.self) { u in
+                ForEach(photos) { p in
                     ZStack(alignment: .topTrailing) {
-                        PhotoThumb(url: u, size: 104, radius: 18)
-                        Button { urls.removeAll { $0 == u } } label: {
+                        PhotoThumb(url: p.url, size: 104, radius: 18)
+                        Button { photos.removeAll { $0.id == p.id } } label: {
                             Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundColor(.white)
                                 .padding(6).background(.black.opacity(0.5)).clipShape(Circle())
                         }
                         .padding(6)
                     }
                 }
-                if urls.count < maxPhotos {
-                    PhotosPicker(selection: $pickerItems, maxSelectionCount: maxPhotos - urls.count, matching: .images) {
+                if photos.count < maxPhotos {
+                    PhotosPicker(selection: $pickerItems, maxSelectionCount: maxPhotos - photos.count, matching: .images) {
                         VStack(spacing: 6) {
                             if uploading { ProgressView() } else { Image(systemName: "camera").font(.system(size: 24)) }
                             Text(settings.t("from_gallery")).font(.system(size: 11.5, weight: .semibold))
@@ -139,13 +149,18 @@ struct CreateWriteOffView: View {
                         .frame(maxWidth: .infinity).frame(height: 50).foregroundColor(.white).background(AppColor.green)
                         .clipShape(RoundedRectangle(cornerRadius: 13))
                 }
-                PhotosPicker(selection: $pickerItems, maxSelectionCount: maxPhotos - urls.count, matching: .images) {
+                PhotosPicker(selection: $pickerItems, maxSelectionCount: maxPhotos - photos.count, matching: .images) {
                     Label(settings.t("from_gallery"), systemImage: "photo").font(.system(size: 14, weight: .semibold))
                         .frame(maxWidth: .infinity).frame(height: 50).foregroundColor(AppColor.text).background(AppColor.surface)
                         .overlay(RoundedRectangle(cornerRadius: 13).stroke(AppColor.line, lineWidth: 1.5))
                         .clipShape(RoundedRectangle(cornerRadius: 13))
                 }
-                .disabled(urls.count >= maxPhotos)
+                .disabled(photos.count >= maxPhotos)
+            }
+
+            // Вердикт ИИ (распознавание порчи на фото)
+            if !aiItems.isEmpty {
+                AiVerdictView(items: aiItems, needsWriteoff: aiNeedsWriteoff)
             }
         }
     }
@@ -218,7 +233,7 @@ struct CreateWriteOffView: View {
                 summaryRow(settings.t("f_point"), store.stores.first { $0.id == storeId }?.name ?? "—")
                 summaryRow(settings.t("f_type"), settings.t(typeLabelKey(wtype)))
                 if wtype == WType.withDeduction { summaryRow(settings.t("f_emp"), store.employees.first { $0.id == employeeId }?.fullName ?? "—") }
-                summaryRow(settings.t("f_photos"), "\(urls.count)")
+                summaryRow(settings.t("f_photos"), "\(photos.count)")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(15).background(AppColor.surface2).clipShape(RoundedRectangle(cornerRadius: 14))
@@ -297,7 +312,17 @@ struct CreateWriteOffView: View {
     // MARK: действия
     private func upload(_ data: Data) async {
         uploading = true; error = nil
-        do { let r = try await APIClient.shared.uploadPhoto(data); if urls.count < maxPhotos { urls.append(r.url) } }
+        do {
+            let r = try await APIClient.shared.uploadPhoto(data)
+            if photos.count < maxPhotos {
+                photos.append(UploadedPhoto(url: r.url, recognition: r.recognition))
+                // Автозаполнение причины из подсказки ИИ, если комментарий ещё пуст
+                if let reason = r.recognition?.suggestedReason,
+                   comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    comment = reason
+                }
+            }
+        }
         catch { self.error = (error as? APIError)?.message ?? settings.t("error_generic") }
         uploading = false
     }
@@ -318,7 +343,7 @@ struct CreateWriteOffView: View {
                 "type": wtype,
                 "deduction_employee_id": wtype == WType.withDeduction ? employeeId : nil,
                 "comment": comment.trimmingCharacters(in: .whitespacesAndNewlines),
-                "photo_urls": urls,
+                "photo_urls": photos.map(\.url),
             ])
             settings.showToast(settings.t("sent_toast"))
             reset()
@@ -329,6 +354,60 @@ struct CreateWriteOffView: View {
     }
 
     private func reset() {
-        stepIndex = 0; urls = []; storeId = auth.user?.storeId; wtype = ""; employeeId = nil; comment = ""; empQuery = ""
+        stepIndex = 0; photos = []; storeId = auth.user?.storeId; wtype = ""; employeeId = nil; comment = ""; empQuery = ""
+    }
+}
+
+// Карточка вердикта ИИ: что распознали модели (тип продукта + испорченность) на фото.
+struct AiVerdictView: View {
+    @EnvironmentObject var settings: AppSettings
+    let items: [DetectedItem]
+    let needsWriteoff: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                ZStack { RoundedRectangle(cornerRadius: 8).fill(AppColor.greenTint).frame(width: 28, height: 28)
+                    Image(systemName: "sparkles").font(.system(size: 14)).foregroundColor(AppColor.green) }
+                Text(settings.t("ai_title")).font(AppFont.head(14.5)).foregroundColor(AppColor.text)
+            }
+            ForEach(Array(items.enumerated()), id: \.offset) { _, it in
+                HStack(spacing: 8) {
+                    Text(it.product).font(.system(size: 13.5, weight: .medium)).foregroundColor(AppColor.text)
+                    Spacer()
+                    StateChip(state: it.state)
+                    Text("\(Int((it.confidence * 100).rounded()))%")
+                        .font(.system(size: 11)).foregroundColor(AppColor.faint).monospacedDigit().frame(width: 36, alignment: .trailing)
+                }
+            }
+            Text(needsWriteoff ? settings.t("ai_writeoff") : settings.t("ai_ok"))
+                .font(.system(size: 12)).foregroundColor(needsWriteoff ? AppColor.red : AppColor.muted)
+        }
+        .padding(16)
+        .background(AppColor.surface2)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(needsWriteoff ? AppColor.red : AppColor.line, lineWidth: 1.5))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+// Чип состояния от классификатора → цвет/подпись
+struct StateChip: View {
+    @EnvironmentObject var settings: AppSettings
+    let state: String
+
+    private var style: (String, Color, Color) {
+        switch state {
+        case "spoiled": return (settings.t("ai_state_spoiled"), AppColor.red, AppColor.redTint)
+        case "defect":  return (settings.t("ai_state_defect"), AppColor.orange, AppColor.orangeTint)
+        case "good":    return (settings.t("ai_state_good"), AppColor.green, AppColor.greenTint)
+        default:        return (state, AppColor.muted, AppColor.surface2)
+        }
+    }
+
+    var body: some View {
+        let s = style
+        Text(s.0).font(.system(size: 11, weight: .semibold))
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .foregroundColor(s.1).background(s.2).clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }

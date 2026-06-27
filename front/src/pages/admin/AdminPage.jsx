@@ -320,11 +320,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
               onChange={set('password')}
               hint={isEdit ? t.password_keep : undefined}
             />
-            <Select label={t.f_role} value={form.role} onChange={set('role')}>
-              <option value={ROLE_SENDER}>{t.role_sender}</option>
-              <option value={ROLE_REVIEWER}>{t.role_reviewer}</option>
-              <option value={ROLE_ADMIN}>{t.role_admin}</option>
-            </Select>
+            <RoleChips value={form.role} onChange={(r) => setForm((f) => ({ ...f, role: r }))} t={t} />
             {storeOptions}
             <Field label={t.f_email} value={form.email} onChange={set('email')} />
             <Field label={t.f_phone} value={form.phone} onChange={set('phone')} />
@@ -375,6 +371,41 @@ function Field({ label, value, onChange, type = 'text', hint }) {
         className="h-12 bg-surface border-[1.5px] border-line rounded-xl px-3.5 outline-none text-[15px] text-text focus:border-green transition-colors"
       />
       {hint && <span className="text-[11.5px] text-faint">{hint}</span>}
+    </label>
+  );
+}
+
+// Явный выбор роли пользователя — чипы (создание и редактирование).
+function RoleChips({ value, onChange, t }) {
+  const roles = [
+    { key: ROLE_SENDER, label: t.role_sender },
+    { key: ROLE_REVIEWER, label: t.role_reviewer },
+    { key: ROLE_ADMIN, label: t.role_admin },
+  ];
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[12.5px] font-semibold text-text">{t.f_role}</span>
+      <div className="grid grid-cols-3 gap-2">
+        {roles.map((r) => {
+          const active = value === r.key;
+          const c = ROLE_BADGE[r.key];
+          return (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => onChange(r.key)}
+              className="h-10 rounded-xl border-[1.5px] font-semibold text-[12px] leading-tight px-1 cursor-pointer transition"
+              style={{
+                background: active ? c.bg : 'var(--surface)',
+                color: active ? c.fg : 'var(--muted)',
+                borderColor: active ? c.fg : 'var(--line)',
+              }}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
     </label>
   );
 }

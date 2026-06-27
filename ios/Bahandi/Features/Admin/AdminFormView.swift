@@ -58,14 +58,10 @@ struct AdminFormView: View {
                         TextField(settings.t("f_fullname"), text: $fullName)
                         if !isEdit { TextField(settings.t("f_username"), text: $username).textInputAutocapitalization(.never).autocorrectionDisabled() }
                         SecureField(settings.t("f_password"), text: $password)
-                        Picker(settings.t("f_role"), selection: $role) {
-                            Text(settings.t("role_sender")).tag(Role.sender)
-                            Text(settings.t("role_reviewer")).tag(Role.reviewer)
-                            Text(settings.t("role_admin")).tag(Role.admin)
-                        }
+                        rolePicker
                         storePicker
                         TextField(settings.t("f_email"), text: $email).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        if isEdit { Toggle(settings.t("save"), isOn: $isActive) }
+                        if isEdit { Toggle(settings.t("admin_active"), isOn: $isActive) }
                     }
                 case .store:
                     Section {
@@ -92,6 +88,33 @@ struct AdminFormView: View {
             .onAppear(perform: prefill)
             .tint(AppColor.green)
         }
+    }
+
+    // Явный выбор роли — чипы (создание и редактирование пользователя).
+    private var rolePicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(settings.t("f_role")).font(.system(size: 12.5, weight: .semibold)).foregroundColor(AppColor.muted)
+            HStack(spacing: 8) {
+                roleChip(Role.sender, settings.t("role_sender"), AppColor.muted, AppColor.surface2)
+                roleChip(Role.reviewer, settings.t("role_reviewer"), AppColor.green, AppColor.greenTint)
+                roleChip(Role.admin, settings.t("role_admin"), AppColor.orange, AppColor.orangeTint)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func roleChip(_ value: String, _ label: String, _ fg: Color, _ bg: Color) -> some View {
+        let active = role == value
+        return Button { role = value } label: {
+            Text(label)
+                .font(.system(size: 11.5, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity).frame(height: 38)
+                .foregroundColor(active ? fg : AppColor.muted)
+                .background(active ? bg : AppColor.surface)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(active ? fg : AppColor.line, lineWidth: 1.5))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
     }
 
     private var storePicker: some View {

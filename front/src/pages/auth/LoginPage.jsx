@@ -12,7 +12,7 @@ import { HOME_ROUTE_BY_ROLE } from '../../constants/roles';
 const DEMO = {
   sender: { identifier: 'sender1', password: 'sender123' },
   reviewer: { identifier: 'reviewer', password: 'reviewer123' },
-  admin: { identifier: 'admin', password: 'admin12345' },
+  admin: { identifier: 'admin', password: 'admin123' },
 };
 
 export default function LoginPage() {
