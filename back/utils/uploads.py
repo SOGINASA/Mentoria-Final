@@ -6,7 +6,6 @@ import os
 import uuid
 
 from flask import current_app
-from werkzeug.utils import secure_filename
 
 
 def allowed_file(filename):
@@ -31,7 +30,12 @@ def save_image_file(file):
         allowed = ', '.join(sorted(current_app.config['ALLOWED_IMAGE_EXTENSIONS']))
         raise ValueError(f'Недопустимый формат. Разрешены: {allowed}')
 
-    ext = secure_filename(file.filename).rsplit('.', 1)[1].lower()
+    # Расширение берём из ИСХОДНОГО имени: оно уже прошло allowed_file() и входит
+    # в белый список (значит безопасно). secure_filename здесь применять нельзя —
+    # для имён на кириллице он вырезает все не-ASCII символы и вместе с ними может
+    # убить расширение ('фото.jpg' -> 'jpg'), из-за чего rsplit('.')[1] падал.
+    # Итоговое имя всё равно генерим как UUID, исходное имя не сохраняем.
+    ext = file.filename.rsplit('.', 1)[1].lower()
     filename = f"{uuid.uuid4().hex}.{ext}"
 
     upload_dir = current_app.config['UPLOAD_FOLDER']
