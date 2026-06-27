@@ -103,26 +103,28 @@ struct AdminRow: View {
     let tap: () -> Void
 
     var body: some View {
-        HStack(spacing: 13) {
-            avatar
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 14.5, weight: .semibold)).foregroundColor(AppColor.text).lineLimit(1)
-                Text(sub.isEmpty ? "—" : sub).font(.system(size: 12.5)).foregroundColor(AppColor.muted).lineLimit(1)
+        Button(action: tap) {
+            HStack(spacing: 13) {
+                avatar
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.system(size: 14.5, weight: .semibold)).foregroundColor(AppColor.text).lineLimit(1)
+                    Text(sub.isEmpty ? "—" : sub).font(.system(size: 12.5)).foregroundColor(AppColor.muted).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if let badge {
+                    Text(badge).font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .foregroundColor(badgeColors.0).background(badgeColors.1).clipShape(Capsule())
+                }
+                Image(systemName: "chevron.right").foregroundColor(AppColor.faint).font(.system(size: 13))
             }
-            Spacer(minLength: 4)
-            if let badge {
-                Text(badge).font(.system(size: 11, weight: .semibold))
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .foregroundColor(badgeColors.0).background(badgeColors.1).clipShape(Capsule())
-            }
-            Image(systemName: "chevron.right").foregroundColor(AppColor.faint).font(.system(size: 13))
+            .opacity(active ? 1 : 0.5)
+            .padding(12).background(AppColor.surface)
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppColor.line, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .contentShape(Rectangle())
         }
-        .opacity(active ? 1 : 0.5)
-        .padding(12).background(AppColor.surface)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppColor.line, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .contentShape(Rectangle())
-        .onTapGesture(perform: tap)
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder private var avatar: some View {

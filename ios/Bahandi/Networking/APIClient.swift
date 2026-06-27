@@ -64,8 +64,17 @@ final class APIClient {
         }
     }
 
+    // Собираем URL конкатенацией, а не appendingPathComponent — иначе "?" и "&"
+    // в query-строке экранируются (?→%3F) и сервер отдаёт 404.
+    private func makeURL(_ path: String) -> URL? {
+        URL(string: apiURL.absoluteString + "/" + path)
+    }
+
     private func send(_ path: String, method: String, body: [String: Any?]?, authorized: Bool, retryOn401: Bool) async throws -> Data {
-        var req = URLRequest(url: apiURL.appendingPathComponent(path))
+        guard let url = makeURL(path) else {
+            throw APIError(message: "Некорректный адрес запроса", status: 0)
+        }
+        var req = URLRequest(url: url)
         req.httpMethod = method
         if authorized, let token = TokenStore.access {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

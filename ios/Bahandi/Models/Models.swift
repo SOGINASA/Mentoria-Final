@@ -91,7 +91,19 @@ struct WriteOffsResponse: Codable { let writeOffs: [WriteOff]; var pagination: P
 struct StoresResponse: Codable { let stores: [Store] }
 struct EmployeesResponse: Codable { let employees: [Employee] }
 struct UsersResponse: Codable { let users: [User] }
-struct UploadResponse: Codable { let url: String; let filename: String }
+// Результат распознавания ИИ по фото (тип продукта + испорченность).
+struct DetectedItem: Codable, Hashable {
+    let product: String
+    let state: String        // spoiled | defect | good
+    let confidence: Double
+    let requiresWriteoff: Bool
+}
+struct Recognition: Codable, Hashable {
+    var detectedItems: [DetectedItem] = []
+    var suggestedReason: String?
+    var writeoffRequired: Bool?
+}
+struct UploadResponse: Codable { let url: String; let filename: String; var recognition: Recognition? }
 struct UserResponse: Codable { let user: User }
 struct StoreResponse: Codable { let store: Store }
 struct EmployeeResponse: Codable { let employee: Employee }
