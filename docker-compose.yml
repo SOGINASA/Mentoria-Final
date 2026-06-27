@@ -23,9 +23,18 @@ services:
       # Путь к БД ВНУТРИ контейнера — жёстко привязан к volume ниже.
       # Перекрывает DATABASE_URL из .env (там путь для не-docker запуска).
       - DATABASE_URL=sqlite:////app/database/database.db
+      # Веса моделей распознавания (монтируются из ./ml/runs ниже).
+      # Контекст сборки бэка — только ./back, поэтому ml/ кладём volume'ом.
+      - DETECTOR_MODEL_PATH=/models/runs/detect/runs/writeoff_detector-3/weights/best.pt
+      - CLASSIFIER_MODEL_PATH=/models/runs/classify/runs/writeoff_classifier/weights/best.pt
+      # Число воркеров gunicorn: каждый грузит свою копию моделей (~0.5–1 ГБ).
+      # На небольшом сервере держим 2, иначе риск OOM.
+      - GUNICORN_WORKERS=2
     volumes:
       - ./back/database:/app/database
       - ./back/static/uploads:/app/static/uploads
+      # Обученные веса YOLO (лежат в git) — read-only внутрь контейнера.
+      - ./ml/runs:/models/runs:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5252/api/health')"]

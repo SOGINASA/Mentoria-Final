@@ -5,6 +5,9 @@ from datetime import timedelta
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BACKEND_DIR, 'database')
 UPLOAD_DIR = os.path.join(BACKEND_DIR, 'static', 'uploads')
+# Каталог ML-моделей (по умолчанию — соседний ml/ в корне репозитория).
+# В docker веса нужно примонтировать и переопределить пути через переменные ниже.
+ML_DIR = os.environ.get('ML_DIR', os.path.join(BACKEND_DIR, '..', 'ml'))
 
 
 class Config:
@@ -43,6 +46,22 @@ class Config:
     ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'heic', 'heif'}
     # Базовый публичный URL бэкенда (для формирования абсолютных ссылок на фото)
     API_BASE_URL = os.environ.get('API_BASE_URL', 'http://localhost:5252')
+
+    # ── Распознавание продукции (тип + испорченность) ──────────────────────
+    # Две YOLOv8-модели: детектор продукта + классификатор состояния.
+    # RECOGNITION_ENABLED=0 полностью отключает инференс (бэкенд стартует без
+    # ultralytics/torch). Если веса не найдены — загрузка фото продолжит
+    # работать, но без подсказок ИИ (best-effort).
+    RECOGNITION_ENABLED = os.environ.get('RECOGNITION_ENABLED', '1') not in ('0', 'false', 'False', '')
+    DETECTOR_MODEL_PATH = os.environ.get(
+        'DETECTOR_MODEL_PATH',
+        os.path.join(ML_DIR, 'runs', 'detect', 'runs', 'writeoff_detector-3', 'weights', 'best.pt'),
+    )
+    CLASSIFIER_MODEL_PATH = os.environ.get(
+        'CLASSIFIER_MODEL_PATH',
+        os.path.join(ML_DIR, 'runs', 'classify', 'runs', 'writeoff_classifier', 'weights', 'best.pt'),
+    )
+    RECOGNITION_CONF = float(os.environ.get('RECOGNITION_CONF', '0.3'))  # порог детекции
 
     # Iiko интеграция
     # IIKO_MODE: 'mock' (имитация) | 'real' (реальный API, нужны креды)

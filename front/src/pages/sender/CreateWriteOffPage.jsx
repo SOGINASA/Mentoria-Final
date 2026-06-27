@@ -18,7 +18,7 @@ export default function CreateWriteOffPage() {
   const { stores, employees, loadStores, loadEmployees, create, acting } = useWriteOffStore();
 
   const [stepIndex, setStepIndex] = useState(0);
-  const [photos, setPhotos] = useState([]); // [{ url }]
+  const [photos, setPhotos] = useState([]); // [{ url, recognition }]
   const [uploading, setUploading] = useState(false);
   const [storeId, setStoreId] = useState(null);
   const [wtype, setWtype] = useState('');
@@ -75,8 +75,11 @@ export default function CreateWriteOffPage() {
     try {
       for (const file of files) {
         if (photos.length >= MAX_PHOTOS) break;
-        const { url } = await uploadPhoto(file);
-        setPhotos((prev) => (prev.length >= MAX_PHOTOS ? prev : [...prev, { url }]));
+        const { url, recognition } = await uploadPhoto(file);
+        setPhotos((prev) => (prev.length >= MAX_PHOTOS ? prev : [...prev, { url, recognition }]));
+        // Автозаполнение причины: первая «плохая» позиция от ИИ, если поле пустое
+        const reason = recognition?.suggested_reason;
+        if (reason) setComment((c) => (c.trim() ? c : reason));
       }
     } catch (err) {
       setError(err.message);
@@ -84,6 +87,12 @@ export default function CreateWriteOffPage() {
       setUploading(false);
     }
   }
+
+  // Сводный вердикт ИИ по всем загруженным фото: «плохие» позиции вперёд.
+  const aiItems = photos
+    .flatMap((p) => p.recognition?.detected_items || [])
+    .sort((a, b) => (b.requires_writeoff - a.requires_writeoff) || (b.confidence - a.confidence));
+  const aiNeedsWriteoff = aiItems.some((it) => it.requires_writeoff);
 
   function next() {
     if (!valid) return;
@@ -189,6 +198,8 @@ export default function CreateWriteOffPage() {
                 {t.from_gallery}
               </button>
             </div>
+
+            {aiItems.length > 0 && <AiVerdict items={aiItems} needsWriteoff={aiNeedsWriteoff} t={t} />}
           </div>
         )}
 
@@ -336,6 +347,48 @@ export default function CreateWriteOffPage() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Состояние от классификатора → цвет/подпись
+const STATE_META = {
+  spoiled: { label: 'испорчен', tint: 'var(--red-tint)', fg: 'var(--red)' },
+  defect:  { label: 'повреждён', tint: 'var(--orange-tint)', fg: 'var(--orange)' },
+  good:    { label: 'годен', tint: 'var(--gst-tint)', fg: 'var(--gst)' },
+};
+
+function StateChip({ state }) {
+  const m = STATE_META[state] || { label: state, tint: 'var(--surface2)', fg: 'var(--muted)' };
+  return (
+    <span className="text-[11px] font-semibold rounded-md px-1.5 py-0.5" style={{ background: m.tint, color: m.fg }}>
+      {m.label}
+    </span>
+  );
+}
+
+// Карточка вердикта ИИ: что распознали модели (тип + испорченность) на фото.
+function AiVerdict({ items, needsWriteoff, t }) {
+  return (
+    <div className="rounded-2xl p-4 border-[1.5px]" style={{ background: 'var(--surface2)', borderColor: needsWriteoff ? 'var(--red)' : 'var(--line)' }}>
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="w-7 h-7 flex-none rounded-lg grid place-items-center" style={{ background: 'var(--green-tint)', color: 'var(--green)' }}>
+          <Icon name="camera" size={15} />
+        </div>
+        <span className="font-head font-semibold text-[14.5px] text-text">{t.ai_title}</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {items.map((it, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="flex-1 text-[13.5px] text-text font-medium">{it.product}</span>
+            <StateChip state={it.state} />
+            <span className="text-[11px] text-faint tabular-nums w-9 text-right">{Math.round(it.confidence * 100)}%</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-[12px] mt-2.5 m-0" style={{ color: needsWriteoff ? 'var(--red)' : 'var(--muted)' }}>
+        {needsWriteoff ? t.ai_writeoff : t.ai_ok}
+      </p>
     </div>
   );
 }
