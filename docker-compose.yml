@@ -1,0 +1,49 @@
+# Общий compose: бэкенд (Flask) + фронтенд (CRA -> статик-сервер serve).
+# Все значения берутся из .env (см. .env.example). В compose — только ссылки.
+#
+# Схема прода: бэк и фронт стоят на РАЗНЫХ хостах и общаются по публичному
+# HTTPS API. Связь настраивается в .env:
+#   • REACT_APP_API_URL — публичный URL API, вшивается в бандл фронта при сборке
+#   • CORS_ORIGINS      — публичный домен фронта, который бэк пускает по CORS
+#   • API_BASE_URL      — публичный адрес бэка (для ссылок на фото)
+#
+# Запуск: cp .env.example .env && docker compose up --build
+#   фронт: http://localhost:3000   API: http://localhost:5252/api
+services:
+  backend:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    container_name: writeoff-backend
+    ports:
+      - "5252:5252"
+    env_file:
+      - .env
+    volumes:
+      - ./back/database:/app/database
+      - ./back/static/uploads:/app/static/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5252/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+      args:
+        # build-time переменная CRA, значение берётся из .env
+        REACT_APP_API_URL: ${REACT_APP_API_URL}
+    container_name: writeoff-frontend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
