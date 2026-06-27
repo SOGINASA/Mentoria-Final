@@ -19,6 +19,10 @@ services:
       - "5252:5252"
     env_file:
       - ./back/.env
+    environment:
+      # Путь к БД ВНУТРИ контейнера — жёстко привязан к volume ниже.
+      # Перекрывает DATABASE_URL из .env (там путь для не-docker запуска).
+      - DATABASE_URL=sqlite:////app/database/database.db
     volumes:
       - ./back/database:/app/database
       - ./back/static/uploads:/app/static/uploads
@@ -31,6 +35,9 @@ services:
       start_period: 10s
 
   frontend:
+    # Фронт в отдельном профиле — по умолчанию НЕ поднимается.
+    # Этот хост только под бэк. Фронт-хост: docker compose --profile frontend up -d --build frontend
+    profiles: ["frontend"]
     build:
       context: ./front
       dockerfile: Dockerfile
