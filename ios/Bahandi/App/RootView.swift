@@ -30,6 +30,7 @@ struct MainTabView: View {
                 tab(HistoryView(), "nav_history", "clock")
                 tab(ProfileView(), "nav_profile", "person")
             case Role.admin:
+                tab(AnalyticsView(), "nav_analytics", "chart.bar.xaxis")
                 tab(AdminView(), "nav_admin", "slider.horizontal.3")
                 tab(ReviewQueueView(), "nav_queue", "tray.full")
                 tab(ProfileView(), "nav_profile", "person")

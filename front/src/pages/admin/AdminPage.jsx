@@ -10,6 +10,7 @@ import * as adminApi from '../../api/admin.api';
 import { listUsers, listStores, listEmployees } from '../../api/admin.api';
 import { initials } from '../../utils/format';
 import { ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN } from '../../constants/roles';
+import AdminAnalytics from './AdminAnalytics';
 
 const ROLE_BADGE = {
   [ROLE_ADMIN]: { bg: 'var(--orange-tint)', fg: 'var(--orange)' },
@@ -21,7 +22,7 @@ export default function AdminPage() {
   const { t } = useI18n();
   const showToast = useUiStore((s) => s.showToast);
 
-  const [tab, setTab] = useState('users');
+  const [tab, setTab] = useState('analytics');
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -71,6 +72,7 @@ export default function AdminPage() {
   }
 
   const tabs = [
+    { key: 'analytics', label: t.nav_analytics },
     { key: 'users', label: t.admin_users },
     { key: 'stores', label: t.admin_stores },
     { key: 'employees', label: t.admin_employees },
@@ -82,22 +84,26 @@ export default function AdminPage() {
 
   return (
     <div className="p-5 max-w-[1080px] mx-auto">
-      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-        <div className="text-[13.5px] text-muted">
-          {count} {countWord}
+      {tab !== 'analytics' && (
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <div className="text-[13.5px] text-muted">
+            {count} {countWord}
+          </div>
+          <button
+            onClick={() => setSheet({ mode: 'create' })}
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-green text-white font-semibold text-[13.5px] cursor-pointer hover:brightness-110 transition"
+          >
+            <Icon name="plus" size={18} strokeWidth={2.4} />
+            {addLabel}
+          </button>
         </div>
-        <button
-          onClick={() => setSheet({ mode: 'create' })}
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-green text-white font-semibold text-[13.5px] cursor-pointer hover:brightness-110 transition"
-        >
-          <Icon name="plus" size={18} strokeWidth={2.4} />
-          {addLabel}
-        </button>
-      </div>
+      )}
 
       <Tabs items={tabs} value={tab} onChange={setTab} />
 
-      {loading ? (
+      {tab === 'analytics' ? (
+        <AdminAnalytics />
+      ) : loading ? (
         <div className="grid place-items-center py-16">
           <Spinner />
         </div>

@@ -17,6 +17,7 @@ struct CreateWriteOffView: View {
     @State private var wtype = ""
     @State private var employeeId: Int?
     @State private var comment = ""
+    @State private var productName = "" // только фронт (бэк подвяжем позже)
     @State private var empQuery = ""
     @State private var error: String?
 
@@ -211,6 +212,17 @@ struct CreateWriteOffView: View {
 
     private var commentStep: some View {
         VStack(spacing: 16) {
+            // Название товара — только фронт (бэк подвяжем позже через items)
+            VStack(alignment: .leading, spacing: 7) {
+                Text(settings.t("f_product")).font(.system(size: 13, weight: .semibold)).foregroundColor(AppColor.text)
+                TextField(settings.t("f_product_ph"), text: $productName)
+                    .font(.system(size: 15)).foregroundColor(AppColor.text)
+                    .padding(.horizontal, 14).frame(height: 48)
+                    .background(AppColor.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(AppColor.line, lineWidth: 1.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 13))
+            }
+
             VStack(spacing: 8) {
                 TextEditor(text: $comment)
                     .frame(minHeight: 120).scrollContentBackground(.hidden)
@@ -230,6 +242,9 @@ struct CreateWriteOffView: View {
 
             VStack(alignment: .leading, spacing: 9) {
                 Text(settings.t("summary")).font(.system(size: 12, weight: .semibold)).foregroundColor(AppColor.faint).textCase(.uppercase)
+                if !productName.trimmingCharacters(in: .whitespaces).isEmpty {
+                    summaryRow(settings.t("f_product"), productName.trimmingCharacters(in: .whitespaces))
+                }
                 summaryRow(settings.t("f_point"), store.stores.first { $0.id == storeId }?.name ?? "—")
                 summaryRow(settings.t("f_type"), settings.t(typeLabelKey(wtype)))
                 if wtype == WType.withDeduction { summaryRow(settings.t("f_emp"), store.employees.first { $0.id == employeeId }?.fullName ?? "—") }
@@ -354,7 +369,7 @@ struct CreateWriteOffView: View {
     }
 
     private func reset() {
-        stepIndex = 0; photos = []; storeId = auth.user?.storeId; wtype = ""; employeeId = nil; comment = ""; empQuery = ""
+        stepIndex = 0; photos = []; storeId = auth.user?.storeId; wtype = ""; employeeId = nil; comment = ""; productName = ""; empQuery = ""
     }
 }
 

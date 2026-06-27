@@ -24,6 +24,7 @@ export default function CreateWriteOffPage() {
   const [wtype, setWtype] = useState('');
   const [employeeId, setEmployeeId] = useState(null);
   const [comment, setComment] = useState('');
+  const [productName, setProductName] = useState(''); // только фронт (бэк пока не подвязан)
   const [empQuery, setEmpQuery] = useState('');
   const [error, setError] = useState(null);
 
@@ -296,6 +297,17 @@ export default function CreateWriteOffPage() {
         {/* ШАГ: комментарий + сводка */}
         {cur === 'comment' && (
           <div>
+            {/* Название товара — только фронт (бэк подвяжем позже через items) */}
+            <label className="flex flex-col gap-1.5 mb-3">
+              <span className="text-[13px] font-semibold text-text">{t.f_product}</span>
+              <input
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                placeholder={t.f_product_ph}
+                className="h-12 bg-surface border-[1.5px] border-line rounded-2xl px-3.5 outline-none text-[15px] text-text focus:border-green transition-colors"
+              />
+            </label>
+
             <div className="bg-surface border-[1.5px] border-line rounded-2xl p-3.5 focus-within:border-green transition-colors">
               <textarea
                 value={comment}
@@ -316,6 +328,7 @@ export default function CreateWriteOffPage() {
             <div className="mt-4 bg-surface2 rounded-2xl p-4">
               <div className="text-xs text-faint font-semibold tracking-wide uppercase mb-2.5">{t.summary}</div>
               <div className="flex flex-col gap-2.5">
+                {productName.trim() && <SummaryRow label={t.f_product} value={productName.trim()} />}
                 <SummaryRow label={t.f_point} value={store?.name || '—'} />
                 <SummaryRow label={t.f_type} value={wtype === TYPE_WITH_DEDUCTION ? t.type_hold : t.type_nohold} />
                 {wtype === TYPE_WITH_DEDUCTION && <SummaryRow label={t.f_emp} value={employee?.full_name || '—'} />}
