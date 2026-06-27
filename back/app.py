@@ -9,12 +9,38 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended.exceptions import JWTExtendedException
 from werkzeug.exceptions import HTTPException
+from sqlalchemy import inspect as sa_inspect, text
 
 from config import get_config, DATABASE_DIR, UPLOAD_DIR
 from models import db
 
 migrate = Migrate()
 jwt = JWTManager()
+
+
+# Колонки, добавленные в модели уже ПОСЛЕ первых деплоев. db.create_all() не
+# доливает их в существующую таблицу (создаёт только отсутствующие таблицы), а
+# Flask-Migrate-миграций в проекте нет. Поэтому досоздаём недостающие колонки
+# идемпотентно на старте — иначе INSERT с новым полем падает с
+# OperationalError: table ... has no column named ...
+# Формат: (таблица, колонка, DDL-тип с DEFAULT для бэкфилла существующих строк).
+_SCHEMA_PATCHES = [
+    ('write_offs', 'source', "VARCHAR(20) NOT NULL DEFAULT 'manual'"),
+]
+
+
+def _ensure_schema():
+    """Идемпотентно добавляет недостающие колонки в уже созданные таблицы."""
+    inspector = sa_inspect(db.engine)
+    tables = set(inspector.get_table_names())
+    for table, column, ddl in _SCHEMA_PATCHES:
+        if table not in tables:
+            continue  # таблицы ещё нет — create_all() создаст её сразу с колонкой
+        if column in {c['name'] for c in inspector.get_columns(table)}:
+            continue  # колонка уже есть — ничего не делаем
+        db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {ddl}'))
+        db.session.commit()
+        print(f'[schema] добавлена недостающая колонка {table}.{column}')
 
 
 def create_app(config_object=None):
@@ -33,6 +59,7 @@ def create_app(config_object=None):
 
     with app.app_context():
         db.create_all()
+        _ensure_schema()
 
     # Blueprints
     from routes import auth_bp, stores_bp, writeoffs_bp, uploads_bp, admin_bp, notifications_bp
