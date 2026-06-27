@@ -9,6 +9,7 @@
 .
 ├── front/   — веб-клиент (Create React App + Tailwind CSS + Zustand)
 ├── ios/     — нативное iOS-приложение (SwiftUI, XcodeGen)
+├── android/ — Android-обёртка (WebView вокруг веб-клиента, Kotlin)
 └── back/    — сервер (API, интеграция с iiko)
 ```
 
