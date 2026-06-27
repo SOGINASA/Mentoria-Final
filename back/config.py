@@ -63,6 +63,11 @@ class Config:
     )
     RECOGNITION_CONF = float(os.environ.get('RECOGNITION_CONF', '0.3'))  # порог детекции
 
+    # Аналитика: средняя оценочная стоимость одного списания (₸).
+    # Реальной цены в заявках нет — деньги в дэшборде это ОЦЕНКА (количество × это
+    # значение). Меняется через env без правки кода.
+    ANALYTICS_AVG_LOSS = int(os.environ.get('ANALYTICS_AVG_LOSS', '1500'))
+
     # Iiko интеграция
     # IIKO_MODE: 'mock' (имитация) | 'real' (реальный API, нужны креды)
     IIKO_MODE = os.environ.get('IIKO_MODE', 'mock')

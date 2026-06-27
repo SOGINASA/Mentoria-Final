@@ -41,3 +41,9 @@ export function retryIiko(id) {
 export function getStats(scope) {
   return api.get(`/write-offs/stats${scope ? `?scope=${scope}` : ''}`);
 }
+
+// Сводная аналитика для дэшборда (admin/reviewer). Считается на сервере по всем
+// заявкам. params: { days, store_id }
+export function getAnalytics(params) {
+  return api.get(`/write-offs/analytics${qs(params)}`);
+}

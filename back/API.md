@@ -96,6 +96,22 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 { "pending": 3, "approved": 10, "rejected": 2, "total": 15 }
 ```
 
+### GET `/api/write-offs/analytics`  (роль: reviewer/admin)
+Сводная аналитика для дэшборда. Считается на сервере по **всем** заявкам (не ограничена пагинацией списка). Черновики (`draft`) исключены. Query: `days` (окно тренда, 1..90, по умолч. 7), `store_id` (опц. фильтр по точке).
+Деньги — **оценка**: `count × ANALYTICS_AVG_LOSS` (реальной цены в данных нет; `ANALYTICS_AVG_LOSS` задаётся через env, по умолч. 1500 ₸).
+```json
+{
+  "totals": { "total": 15, "pending": 3, "approved": 10, "rejected": 2 },
+  "with_hold": 4,
+  "no_hold": 11,
+  "avg_loss": 1500,
+  "loss_total": 22500,
+  "by_store": [ { "store_id": 1, "name": "Точка №1", "count": 9, "loss": 13500 } ],
+  "by_employee": [ { "employee_id": 2, "name": "Иванов Иван", "count": 3, "loss": 4500 } ],
+  "trend": [ { "date": "2026-06-22", "count": 1 }, { "date": "2026-06-28", "count": 4 } ]
+}
+```
+
 ---
 
 ## Загрузка фото — `/api/uploads`

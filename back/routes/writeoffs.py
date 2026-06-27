@@ -1,9 +1,9 @@
 """Заявки на списание: создание (отправитель), просмотр, подтверждение/отклонение
 (проверяющий), статистика, интеграция с Iiko при подтверждении."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required
 from sqlalchemy import func
 
@@ -447,4 +447,110 @@ def stats():
         'approved': approved,
         'rejected': rejected,
         'total': draft + pending + approved + rejected,
+    })
+
+
+# --------------------------------------------------------------------------- #
+# Аналитика (админ-дэшборд)
+# --------------------------------------------------------------------------- #
+@writeoffs_bp.route('/analytics', methods=['GET'])
+@role_required(ROLE_REVIEWER, ROLE_ADMIN)
+def analytics():
+    """Сводная аналитика по списаниям для дэшборда.
+
+    Считается на сервере по ВСЕМ заявкам (в отличие от списка, который
+    ограничен пагинацией) — поэтому числа не «обрезаются». Черновики (draft)
+    исключены: это ещё не подтверждённые авто-падения.
+
+    Query:
+        days     — окно тренда в днях (1..90, по умолчанию 7)
+        store_id — ограничить аналитику одной точкой (опц.)
+
+    Деньги — ОЦЕНКА: count × ANALYTICS_AVG_LOSS (реальной цены в данных нет).
+    """
+    days = request.args.get('days', default=7, type=int) or 7
+    days = max(1, min(days, 90))
+    store_id = request.args.get('store_id', type=int)
+    avg_loss = int(current_app.config.get('ANALYTICS_AVG_LOSS', 1500))
+
+    def scoped(query):
+        """Общие фильтры аналитики: без черновиков + опц. по точке."""
+        query = query.filter(WriteOff.status != STATUS_DRAFT)
+        if store_id:
+            query = query.filter(WriteOff.store_id == store_id)
+        return query
+
+    # --- Счётчики по статусам ---
+    status_counts = dict(
+        scoped(db.session.query(WriteOff.status, func.count(WriteOff.id)))
+        .group_by(WriteOff.status).all()
+    )
+    pending = status_counts.get(STATUS_PENDING, 0)
+    approved = status_counts.get(STATUS_APPROVED, 0)
+    rejected = status_counts.get(STATUS_REJECTED, 0)
+    total = pending + approved + rejected
+
+    # --- По типу списания (с удержанием / без) ---
+    type_counts = dict(
+        scoped(db.session.query(WriteOff.type, func.count(WriteOff.id)))
+        .group_by(WriteOff.type).all()
+    )
+    with_hold = type_counts.get(TYPE_WITH_DEDUCTION, 0)
+    no_hold = type_counts.get(TYPE_NO_DEDUCTION, 0)
+
+    # --- Топ точек по числу списаний ---
+    store_rows = (
+        scoped(db.session.query(Store.id, Store.name, func.count(WriteOff.id))
+               .join(WriteOff, WriteOff.store_id == Store.id))
+        .group_by(Store.id, Store.name)
+        .order_by(func.count(WriteOff.id).desc())
+        .limit(6).all()
+    )
+    by_store = [
+        {'store_id': sid, 'name': name, 'count': cnt, 'loss': cnt * avg_loss}
+        for sid, name, cnt in store_rows
+    ]
+
+    # --- Топ сотрудников по удержаниям ---
+    emp_rows = (
+        scoped(db.session.query(Employee.id, Employee.full_name, func.count(WriteOff.id))
+               .join(WriteOff, WriteOff.deduction_employee_id == Employee.id)
+               .filter(WriteOff.type == TYPE_WITH_DEDUCTION))
+        .group_by(Employee.id, Employee.full_name)
+        .order_by(func.count(WriteOff.id).desc())
+        .limit(6).all()
+    )
+    by_employee = [
+        {'employee_id': eid, 'name': name, 'count': cnt, 'loss': cnt * avg_loss}
+        for eid, name, cnt in emp_rows
+    ]
+
+    # --- Динамика по дням (последние `days` суток, UTC) ---
+    start = datetime.now(timezone.utc).date() - timedelta(days=days - 1)
+    trend_rows = (
+        scoped(db.session.query(func.date(WriteOff.created_at), func.count(WriteOff.id)))
+        .filter(func.date(WriteOff.created_at) >= start.isoformat())
+        .group_by(func.date(WriteOff.created_at)).all()
+    )
+    # func.date() в SQLite даёт строку, в Postgres — date; нормализуем ключ.
+    by_date = {str(d): cnt for d, cnt in trend_rows}
+    trend = []
+    for i in range(days):
+        d = (start + timedelta(days=i)).isoformat()
+        trend.append({'date': d, 'count': by_date.get(d, 0)})
+
+    return jsonify({
+        'totals': {
+            'total': total,
+            'pending': pending,
+            'approved': approved,
+            'rejected': rejected,
+        },
+        'with_hold': with_hold,
+        'no_hold': no_hold,
+        'avg_loss': avg_loss,
+        'loss_total': total * avg_loss,
+        'by_store': by_store,
+        'by_employee': by_employee,
+        'trend': trend,
     })
