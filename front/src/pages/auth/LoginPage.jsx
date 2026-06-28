@@ -32,12 +32,15 @@ export default function LoginPage() {
 
   const bioEnabled = isBiometricEnabled();
   const bioName = getBiometricName();
+  // Логин для входа по биометрии: сохранённая подсказка устройства ИЛИ то, что
+  // ввели в поле «Логин». Так кнопка работает и без предыдущей привязки на этом
+  // устройстве (главное — иметь зарегистрированный passkey на бэке).
+  const bioIdentifier = (getBiometricIdentifier() || identifier).trim();
 
   const authenticateBiometric = useCallback(async () => {
-    const identifier = getBiometricIdentifier();
-    if (!identifier) throw new Error('no creds');
-    return loginWithBiometric(identifier);
-  }, [loginWithBiometric]);
+    if (!bioIdentifier) throw new Error('no identifier');
+    return loginWithBiometric(bioIdentifier);
+  }, [loginWithBiometric, bioIdentifier]);
 
   const onBioSuccess = useCallback(
     (user) => {
@@ -215,7 +218,7 @@ export default function LoginPage() {
       </div>
 
       {showScan && (
-        <BiometricScanOverlay enrolled={bioEnabled} onAuthenticate={authenticateBiometric} onSuccess={onBioSuccess} onCancel={() => setShowScan(false)} />
+        <BiometricScanOverlay enrolled={bioEnabled || !!bioIdentifier} onAuthenticate={authenticateBiometric} onSuccess={onBioSuccess} onCancel={() => setShowScan(false)} />
       )}
     </div>
   );
