@@ -121,6 +121,17 @@ def test_stats(client, sender, reviewer, store, auth):
     assert data['total'] == 1
 
 
+def test_create_notifies_reviewer_and_admin(client, sender, reviewer, admin, store, auth):
+    # ручное создание заявки должно наполнять ленту проверяющего И админа
+    client.post('/api/write-offs', headers=auth(sender), json=_create_payload(store))
+    for user in (reviewer, admin):
+        data = client.get('/api/notifications', headers=auth(user)).get_json()
+        assert data['pagination']['total'] >= 1
+        assert data['unread'] >= 1
+        assert data['notifications'][0]['kind'] == 'review_pending'
+        assert data['notifications'][0]['write_off']['status'] == 'pending'
+
+
 def test_analytics_aggregates(client, sender, reviewer, store, employee, auth):
     # две заявки: одна с удержанием, одну подтверждаем
     client.post('/api/write-offs', headers=auth(sender), json=_create_payload(store))
