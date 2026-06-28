@@ -7,14 +7,14 @@ import { useI18n } from '../../i18n/useI18n';
 import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { HOME_ROUTE_BY_ROLE } from '../../constants/roles';
-import { isBiometricEnabled, getBiometricName, getBiometricCreds } from '../../lib/biometric';
+import { isBiometricEnabled, getBiometricName, getBiometricIdentifier } from '../../lib/biometric';
 import BiometricScanOverlay from '../../components/biometric/BiometricScanOverlay';
 
 // Демо-учётки бэкенда (back/seed_data.py)
 const DEMO = {
   sender: { identifier: 'sender1', password: 'sender123' },
   reviewer: { identifier: 'reviewer', password: 'reviewer123' },
-  admin: { identifier: 'admin', password: 'admin123' },
+  admin: { identifier: 'admin', password: 'admin12345' },
 };
 
 export default function LoginPage() {
@@ -22,6 +22,7 @@ export default function LoginPage() {
   const { t, lang, setLang } = useI18n();
   const { theme, toggleTheme } = useUiStore();
   const login = useAuthStore((s) => s.login);
+  const loginWithBiometric = useAuthStore((s) => s.loginWithBiometric);
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -33,10 +34,10 @@ export default function LoginPage() {
   const bioName = getBiometricName();
 
   const authenticateBiometric = useCallback(async () => {
-    const creds = getBiometricCreds();
-    if (!creds) throw new Error('no creds');
-    return login(creds.identifier, creds.password);
-  }, [login]);
+    const identifier = getBiometricIdentifier();
+    if (!identifier) throw new Error('no creds');
+    return loginWithBiometric(identifier);
+  }, [loginWithBiometric]);
 
   const onBioSuccess = useCallback(
     (user) => {

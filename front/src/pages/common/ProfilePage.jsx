@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
 import { useI18n } from '../../i18n/useI18n';
@@ -6,7 +6,7 @@ import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { initials } from '../../utils/format';
 import { ROLE_REVIEWER, ROLE_ADMIN } from '../../constants/roles';
-import { isBiometricEnabled, disableBiometric } from '../../lib/biometric';
+import { isBiometricEnabled, disableBiometric, isBiometricSupported } from '../../lib/biometric';
 import BiometricSetupModal from '../../components/biometric/BiometricSetupModal';
 
 function Toggle({ on, onClick }) {
@@ -32,7 +32,13 @@ export default function ProfilePage() {
   const { user, logout } = useAuthStore();
 
   const [bioOn, setBioOn] = useState(isBiometricEnabled());
+  const [bioSupported, setBioSupported] = useState(true);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
+
+  useEffect(() => {
+    isBiometricSupported().then(setBioSupported);
+  }, []);
 
   const roleLabel = user?.role === ROLE_REVIEWER ? t.role_reviewer : user?.role === ROLE_ADMIN ? t.role_admin : t.role_sender;
 
@@ -41,11 +47,19 @@ export default function ProfilePage() {
     navigate('/login', { replace: true });
   }
 
-  function toggleBiometric() {
+  async function toggleBiometric() {
+    if (bioBusy) return;
     if (bioOn) {
-      disableBiometric();
-      setBioOn(false);
-      showToast(t.bio_disabled_toast);
+      setBioBusy(true);
+      try {
+        await disableBiometric();
+        setBioOn(false);
+        showToast(t.bio_disabled_toast);
+      } finally {
+        setBioBusy(false);
+      }
+    } else if (!bioSupported) {
+      showToast(t.bio_unsupported);
     } else {
       setSetupOpen(true);
     }

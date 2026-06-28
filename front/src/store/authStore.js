@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { tokenStore } from '../api/client';
 import * as authApi from '../api/auth.api';
+import { authenticateBiometricKey } from '../lib/biometric';
 
 // status: 'idle' | 'loading' | 'authed' | 'guest'
 export const useAuthStore = create((set, get) => ({
@@ -27,6 +28,15 @@ export const useAuthStore = create((set, get) => ({
   async login(identifier, password) {
     set({ error: null });
     const data = await authApi.login(identifier, password);
+    tokenStore.set({ access: data.access_token, refresh: data.refresh_token });
+    set({ user: data.user, status: 'authed' });
+    return data.user;
+  },
+
+  // Вход по биометрии (WebAuthn) — без пароля, по сохранённому ключу устройства.
+  async loginWithBiometric(identifier) {
+    set({ error: null });
+    const data = await authenticateBiometricKey(identifier);
     tokenStore.set({ access: data.access_token, refresh: data.refresh_token });
     set({ user: data.user, status: 'authed' });
     return data.user;
