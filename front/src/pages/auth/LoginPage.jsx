@@ -95,7 +95,7 @@ export default function LoginPage() {
           <h1 className="font-head font-semibold text-[25px] text-text text-center mt-7 mb-1">{t.login_title}</h1>
           <p className="text-muted text-sm text-center mb-7">{t.login_sub}</p>
 
-          {bioEnabled && (
+          {(
             <div className="w-full">
               <button
                 type="button"
@@ -214,7 +214,7 @@ export default function LoginPage() {
       </div>
 
       {showScan && (
-        <BiometricScanOverlay onAuthenticate={authenticateBiometric} onSuccess={onBioSuccess} onCancel={() => setShowScan(false)} />
+        <BiometricScanOverlay enrolled={bioEnabled} onAuthenticate={authenticateBiometric} onSuccess={onBioSuccess} onCancel={() => setShowScan(false)} />
       )}
     </div>
   );

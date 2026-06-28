@@ -4,6 +4,7 @@ import SwiftUI
 // authenticate: выполняет реальный вход (флипает auth.status). Вызывается после анимации.
 struct BiometricScanView: View {
     @EnvironmentObject var settings: AppSettings
+    var enrolled: Bool = true
     let authenticate: () async throws -> Void
     let onCancel: () -> Void
 
@@ -24,10 +25,12 @@ struct BiometricScanView: View {
 
                 if phase == .error {
                     VStack(spacing: 10) {
-                        Button { run() } label: {
-                            Text(settings.t("bio_retry")).font(AppFont.head(16)).foregroundColor(.white)
-                                .frame(maxWidth: .infinity).frame(height: 50).background(AppColor.green)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        if enrolled {
+                            Button { run() } label: {
+                                Text(settings.t("bio_retry")).font(AppFont.head(16)).foregroundColor(.white)
+                                    .frame(maxWidth: .infinity).frame(height: 50).background(AppColor.green)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
                         }
                         Button(action: onCancel) {
                             Text(settings.t("bio_use_pass")).font(.system(size: 14, weight: .semibold)).foregroundColor(AppColor.text)
@@ -54,13 +57,13 @@ struct BiometricScanView: View {
         switch phase {
         case .scanning: return settings.t("bio_scan_title")
         case .success: return settings.t("bio_success")
-        case .error: return settings.t("bio_error")
+        case .error: return settings.t(enrolled ? "bio_error" : "bio_not_set")
         }
     }
     private var subtitle: String {
         switch phase {
         case .scanning: return settings.t("bio_scan_sub")
-        case .error: return settings.t("bio_error_sub")
+        case .error: return settings.t(enrolled ? "bio_error_sub" : "bio_not_set_sub")
         case .success: return ""
         }
     }

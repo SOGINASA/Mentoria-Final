@@ -6,7 +6,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Полноэкранный сканер для входа по биометрии.
 // onAuthenticate: async () => user (бросает при неуспехе)
-export default function BiometricScanOverlay({ onAuthenticate, onSuccess, onCancel }) {
+export default function BiometricScanOverlay({ onAuthenticate, onSuccess, onCancel, enrolled = true }) {
   const { t } = useI18n();
   const [phase, setPhase] = useState('scanning'); // scanning | success | error
   const aliveRef = useRef(true);
@@ -40,7 +40,11 @@ export default function BiometricScanOverlay({ onAuthenticate, onSuccess, onCanc
   const titles = {
     scanning: { title: t.bio_scan_title, sub: t.bio_scan_sub, color: 'var(--text)' },
     success: { title: t.bio_success, sub: '', color: 'var(--green)' },
-    error: { title: t.bio_error, sub: t.bio_error_sub, color: 'var(--red)' },
+    error: {
+      title: enrolled ? t.bio_error : t.bio_not_set,
+      sub: enrolled ? t.bio_error_sub : t.bio_not_set_sub,
+      color: 'var(--red)',
+    },
   }[phase];
 
   return (
@@ -57,12 +61,14 @@ export default function BiometricScanOverlay({ onAuthenticate, onSuccess, onCanc
 
       {phase === 'error' ? (
         <div className="flex flex-col gap-2.5 w-full max-w-[300px] mt-7">
-          <button
-            onClick={run}
-            className="h-12 rounded-2xl bg-green text-white font-head font-semibold text-base cursor-pointer hover:brightness-110 active:scale-[.98] transition"
-          >
-            {t.bio_retry}
-          </button>
+          {enrolled && (
+            <button
+              onClick={run}
+              className="h-12 rounded-2xl bg-green text-white font-head font-semibold text-base cursor-pointer hover:brightness-110 active:scale-[.98] transition"
+            >
+              {t.bio_retry}
+            </button>
+          )}
           <button onClick={onCancel} className="h-12 rounded-2xl border-[1.5px] border-line bg-surface text-text font-semibold text-sm cursor-pointer">
             {t.bio_use_pass}
           </button>

@@ -196,6 +196,8 @@ export const translations = {
     bio_enrolled: 'Биометрия включена',
     bio_wrong_pass: 'Неверный пароль',
     bio_disabled_toast: 'Биометрия отключена',
+    bio_not_set: 'Биометрия не настроена',
+    bio_not_set_sub: 'Войдите по паролю и включите вход по биометрии в профиле',
   },
   kz: {
     app_name: 'Есептен шығару',
@@ -393,5 +395,7 @@ export const translations = {
     bio_enrolled: 'Биометрия қосылды',
     bio_wrong_pass: 'Қате құпиясөз',
     bio_disabled_toast: 'Биометрия өшірілді',
+    bio_not_set: 'Биометрия бапталмаған',
+    bio_not_set_sub: 'Құпиясөзбен кіріп, профильде биометрияны қосыңыз',
   },
 };

@@ -37,7 +37,6 @@ struct LoginView: View {
                     Text(settings.t("login_title")).font(AppFont.head(25)).foregroundColor(AppColor.text).padding(.top, 26)
                     Text(settings.t("login_sub")).font(.system(size: 14)).foregroundColor(AppColor.muted).padding(.top, 4)
 
-                    if bioEnabled {
                         Button { showScan = true } label: {
                             HStack(spacing: 12) {
                                 ZStack { RoundedRectangle(cornerRadius: 13).fill(AppColor.green).frame(width: 48, height: 48)
@@ -64,7 +63,6 @@ struct LoginView: View {
                             Rectangle().fill(AppColor.line).frame(height: 1)
                         }
                         .padding(.top, 18)
-                    }
 
                     VStack(spacing: 14) {
                         field(icon: "person", title: settings.t("login_login"), text: $identifier, placeholder: settings.t("login_ph_login"))
@@ -114,6 +112,7 @@ struct LoginView: View {
         }
         .fullScreenCover(isPresented: $showScan) {
             BiometricScanView(
+                enrolled: bioEnabled,
                 authenticate: {
                     guard let creds = BiometricStore.credentials() else { throw APIError(message: "no creds", status: 0) }
                     try await auth.login(identifier: creds.identifier, password: creds.password)
