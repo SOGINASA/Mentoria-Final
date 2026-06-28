@@ -68,6 +68,15 @@ class Config:
     # значение). Меняется через env без правки кода.
     ANALYTICS_AVG_LOSS = int(os.environ.get('ANALYTICS_AVG_LOSS', '1500'))
 
+    # ── Биометрия / WebAuthn (Face ID, Touch ID, отпечаток, passkey) ───────
+    # RP_ID — домен сайта без схемы и порта (для localhost оставить 'localhost').
+    # ORIGIN — полный источник фронтенда (схема+домен+порт), должен совпадать с
+    # тем, откуда браузер вызывает navigator.credentials. На проде задать оба
+    # через env: WEBAUTHN_RP_ID=writeoff.example.com, WEBAUTHN_ORIGIN=https://writeoff.example.com
+    WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', 'localhost')
+    WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'WriteOff')
+    WEBAUTHN_ORIGIN = os.environ.get('WEBAUTHN_ORIGIN', 'http://localhost:3000')
+
     # Iiko интеграция
     # IIKO_MODE: 'mock' (имитация) | 'real' (реальный API, нужны креды)
     IIKO_MODE = os.environ.get('IIKO_MODE', 'mock')

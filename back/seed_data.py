@@ -11,13 +11,15 @@ import os
 import random
 from datetime import datetime, timezone, timedelta
 
-from models import db, User, Store, Employee, WriteOff, WriteOffPhoto
+from models import db, User, Store, Employee, WriteOff, WriteOffPhoto, WriteOffItem, Notification
 from constants import (
     ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN,
-    STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED,
-    TYPE_NO_DEDUCTION, TYPE_WITH_DEDUCTION, SOURCE_MANUAL,
+    STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED,
+    TYPE_NO_DEDUCTION, TYPE_WITH_DEDUCTION, SOURCE_MANUAL, SOURCE_AUTO_FALL,
     IIKO_SYNCED,
+    NOTIFY_FALL_DRAFT, NOTIFY_FALL_ALERT, NOTIFY_REVIEW_PENDING,
 )
+from services.notifications import notify
 
 # CSV с точками лежит рядом с этим файлом
 STORES_CSV = os.path.join(os.path.dirname(__file__), 'stores_rows.csv')
@@ -220,11 +222,100 @@ def seed_write_offs(stores):
     print(f'[seed] Создано демо-заявок для аналитики: {created}')
 
 
+def seed_notifications(stores):
+    """Демо-уведомления для ленты-колокольчика у всех ролей.
+
+    Воспроизводит реальные сценарии:
+      • авто-падение → сотруднику `fall_draft` (подтвердить черновик),
+        проверяющим и админам — надзорный `fall_alert`;
+      • заявка в статусе pending → проверяющим `review_pending`.
+
+    Идемпотентно: если уведомления уже есть — пропускаем (заодно не плодим
+    повторные авто-черновики).
+    """
+    if Notification.query.count() > 0:
+        print('[seed] Уведомления уже есть — пропускаем.')
+        return
+
+    senders = User.query.filter_by(role=ROLE_SENDER, is_active=True).all()
+    reviewers = User.query.filter_by(role=ROLE_REVIEWER, is_active=True).all()
+    admins = User.query.filter_by(role=ROLE_ADMIN, is_active=True).all()
+
+    rnd = random.Random(7)
+    now = datetime.now(timezone.utc)
+    created = 0
+
+    # --- Сценарий авто-падения: по одному черновику на сотрудника с точкой ---
+    fall_products = [
+        ('Булочка с корицей', 'Падение продукта «Булочка с корицей» на пол — списание по санитарным нормам'),
+        ('Стакан с кофе', 'Падение продукта «Стакан с кофе» на пол — списание по санитарным нормам'),
+        ('Поднос с пирожными', 'Падение продукта «Поднос с пирожными» на пол — списание по санитарным нормам'),
+    ]
+    for idx, sender in enumerate(senders):
+        store = sender.store or (stores[0] if stores else None)
+        if not store:
+            continue
+        product, reason = fall_products[idx % len(fall_products)]
+        ts = now - timedelta(hours=rnd.randint(1, 30))
+
+        draft = WriteOff(
+            author_id=sender.id,
+            store_id=store.id,
+            type=TYPE_NO_DEDUCTION,
+            comment=reason,
+            status=STATUS_DRAFT,
+            source=SOURCE_AUTO_FALL,
+            created_at=ts,
+            updated_at=ts,
+        )
+        db.session.add(draft)
+        db.session.flush()
+        db.session.add(WriteOffPhoto(write_off_id=draft.id, url=DEMO_PHOTO_URL))
+        db.session.add(WriteOffItem(write_off_id=draft.id, product_name=product, quantity=1, unit='шт'))
+
+        # Сотруднику: подтвердите черновик (непрочитано — свежее).
+        n = notify(sender.id, NOTIFY_FALL_DRAFT,
+                   title='Зафиксировано падение продукта',
+                   body=f'{product}: {reason}. Подтвердите черновик списания.',
+                   write_off_id=draft.id, commit=False)
+        n.created_at = ts
+        created += 1
+
+        # Надзор: проверяющим и админам — алерт о падении на точке.
+        alert_body = f'{store.name}: {product} — {reason}'
+        for u in reviewers + admins:
+            na = notify(u.id, NOTIFY_FALL_ALERT,
+                        title='Зафиксировано падение продукта',
+                        body=alert_body, write_off_id=draft.id, commit=False)
+            na.created_at = ts
+            na.is_read = rnd.random() < 0.3
+            created += 1
+
+    # --- Проверяющим: «новая заявка на проверку» по заявкам в статусе pending ---
+    pending = (WriteOff.query
+               .filter_by(status=STATUS_PENDING, source=SOURCE_MANUAL)
+               .order_by(WriteOff.created_at.desc()).limit(8).all())
+    for wo in pending:
+        store_name = wo.store.name if wo.store else 'Точка'
+        for rv in reviewers:
+            n = notify(rv.id, NOTIFY_REVIEW_PENDING,
+                       title='Новая заявка на списание',
+                       body=f'{store_name}: {wo.comment}',
+                       write_off_id=wo.id, commit=False)
+            n.created_at = wo.created_at + timedelta(minutes=2)
+            n.is_read = rnd.random() < 0.4  # часть уже просмотрена
+            created += 1
+
+    db.session.commit()
+    print(f'[seed] Создано демо-уведомлений: {created}')
+
+
 def seed_all():
     stores = seed_stores_from_csv()
     seed_employees(stores)
     seed_users(stores)
     seed_write_offs(stores)
+    seed_notifications(stores)
     print('[seed] Точки, сотрудники и демо-пользователи готовы.')
     print('[seed] Логины: admin/admin12345, reviewer/reviewer123, sender1/sender123, sender2/sender123')
 

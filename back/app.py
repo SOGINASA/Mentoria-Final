@@ -62,13 +62,17 @@ def create_app(config_object=None):
         _ensure_schema()
 
     # Blueprints
-    from routes import auth_bp, stores_bp, writeoffs_bp, uploads_bp, admin_bp, notifications_bp
+    from routes import (
+        auth_bp, stores_bp, writeoffs_bp, uploads_bp, admin_bp,
+        notifications_bp, webauthn_bp,
+    )
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(stores_bp, url_prefix='/api/stores')
     app.register_blueprint(writeoffs_bp, url_prefix='/api/write-offs')
     app.register_blueprint(uploads_bp, url_prefix='/api/uploads')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
+    app.register_blueprint(webauthn_bp, url_prefix='/api/auth/webauthn')
 
     _register_misc_routes(app)
     _register_error_handlers(app)
@@ -86,6 +90,7 @@ def _register_misc_routes(app):
             'description': 'Система автоматизации списаний на торговых точках',
             'endpoints': {
                 'auth': '/api/auth — вход, refresh, профиль',
+                'webauthn': '/api/auth/webauthn — вход по биометрии (Face ID/Touch ID/passkey)',
                 'stores': '/api/stores — точки и их сотрудники',
                 'write_offs': '/api/write-offs — заявки на списание',
                 'uploads': '/api/uploads/photo — загрузка фото',

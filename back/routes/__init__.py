@@ -4,5 +4,6 @@ from routes.writeoffs import writeoffs_bp
 from routes.uploads import uploads_bp
 from routes.admin import admin_bp
 from routes.notifications import notifications_bp
+from routes.webauthn import webauthn_bp
 
-__all__ = ['auth_bp', 'stores_bp', 'writeoffs_bp', 'uploads_bp', 'admin_bp', 'notifications_bp']
+__all__ = ['auth_bp', 'stores_bp', 'writeoffs_bp', 'uploads_bp', 'admin_bp', 'notifications_bp', 'webauthn_bp']

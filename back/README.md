@@ -14,10 +14,11 @@ back/
 ├── app.py                 # app-factory, регистрация blueprints, отдача фото, CLI
 ├── config.py              # конфигурация по переменным окружения
 ├── constants.py           # роли, статусы, типы списания (совпадают с фронтом)
-├── models.py              # User, Store, Employee, WriteOff, WriteOffPhoto, WriteOffItem
+├── models.py              # User, Store, Employee, WriteOff(+Photo/Item), WebAuthnCredential/Challenge
 ├── seed_data.py           # демо-точки, сотрудники, пользователи
 ├── routes/
 │   ├── auth.py            # вход, refresh, /me, смена пароля
+│   ├── webauthn.py        # вход по биометрии (Face ID/Touch ID/passkey)
 │   ├── stores.py          # точки и их сотрудники
 │   ├── writeoffs.py       # создание/просмотр/approve/reject/stats + Iiko
 │   ├── uploads.py         # загрузка фото
@@ -83,6 +84,34 @@ pytest
 Для реальной интеграции: задать `IIKO_MODE=real` и креды (`IIKO_BASE_URL`, `IIKO_API_LOGIN`,
 `IIKO_API_TOKEN`) в `.env`, затем реализовать `_create_act_real()` в
 [services/iiko_service.py](services/iiko_service.py) (там подробные TODO).
+
+## Биометрия (WebAuthn / passkey)
+
+Вход по Face ID / Touch ID / отпечатку / passkey без пароля. Реализован **только API**
+(`routes/webauthn.py`, префикс `/api/auth/webauthn`), интерфейс подключим позже.
+Пакет: `webauthn>=2.7.0`. Challenge'ы одноразовые, хранятся в БД с TTL 5 минут
+(таблица `webauthn_challenges`), ключи — в `webauthn_credentials`.
+
+Поток:
+
+1. **Регистрация ключа** (пользователь уже залогинен паролем, нужен JWT):
+   - `POST /register-options` → опции для `navigator.credentials.create()`;
+   - `POST /register` → сохраняем публичный ключ (тело — ответ аутентификатора + опц. `device_name`).
+2. **Вход по ключу** (без пароля):
+   - `POST /authenticate-options` `{ "identifier": "email|username" }` → опции для `navigator.credentials.get()`;
+   - `POST /authenticate` `{ "identifier", "credential" }` → проверка подписи, выдаёт `access_token` + `refresh_token` (как обычный логин).
+3. **Управление ключами** (нужен JWT): `GET /credentials`, `DELETE /credentials/<id>`.
+
+Переменные окружения (для прода обязательно задать под свой домен):
+
+| Env | По умолчанию | Назначение |
+|-----|--------------|-----------|
+| `WEBAUTHN_RP_ID` | `localhost` | Домен сайта без схемы/порта |
+| `WEBAUTHN_RP_NAME` | `WriteOff` | Имя сервиса в системном диалоге |
+| `WEBAUTHN_ORIGIN` | `http://localhost:3000` | Полный origin фронта (схема+домен+порт) |
+
+> WebAuthn работает только по HTTPS (или `localhost`). На проде `WEBAUTHN_ORIGIN` должен
+> точно совпадать с адресом, откуда браузер вызывает API.
 
 ## Подключение фронта
 

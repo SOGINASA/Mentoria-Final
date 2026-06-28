@@ -242,6 +242,59 @@ class WriteOffItem(db.Model):
         }
 
 
+class WebAuthnCredential(db.Model):
+    """Зарегистрированный ключ WebAuthn (Face ID / Touch ID / отпечаток / passkey).
+    Привязан к пользователю; один пользователь может иметь несколько устройств."""
+    __tablename__ = 'webauthn_credentials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+
+    # credential_id и public_key — бинарные данные ключа аутентификатора
+    credential_id = db.Column(db.LargeBinary, unique=True, nullable=False)
+    public_key = db.Column(db.LargeBinary, nullable=False)
+    # Счётчик подписей — защита от клонирования ключа (растёт при каждом входе)
+    sign_count = db.Column(db.Integer, default=0)
+    device_name = db.Column(db.String(255), default='')
+
+    created_at = db.Column(db.DateTime, default=_now)
+
+    user = db.relationship(
+        'User',
+        backref=db.backref('webauthn_credentials', lazy='dynamic', cascade='all, delete-orphan'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'device_name': self.device_name,
+            'created_at': _utc_iso(self.created_at),
+        }
+
+
+class WebAuthnChallenge(db.Model):
+    """Одноразовый challenge для WebAuthn (TTL 5 минут).
+    Хранится в БД, чтобы работать в многопроцессном gunicorn (in-memory не подходит)."""
+    __tablename__ = 'webauthn_challenges'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    challenge = db.Column(db.LargeBinary, nullable=False)
+    challenge_type = db.Column(db.String(20), nullable=False)  # registration | authentication
+    created_at = db.Column(db.DateTime, default=_now)
+
+    __table_args__ = (
+        db.Index('ix_webauthn_challenges_user_type', 'user_id', 'challenge_type'),
+    )
+
+    def is_expired(self):
+        """True, если с момента создания прошло больше 5 минут."""
+        created = self.created_at
+        if created.tzinfo is None:  # naive datetime из БД — считаем UTC
+            created = created.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - created).total_seconds() > 300
+
+
 class Notification(db.Model):
     """Уведомление пользователю (лента, опрашивается фронтом).
     Используется для авто-падений: сотруднику — подтвердить черновик,
