@@ -291,14 +291,15 @@ def seed_notifications(stores):
             na.is_read = rnd.random() < 0.3
             created += 1
 
-    # --- Проверяющим: «новая заявка на проверку» по заявкам в статусе pending ---
+    # --- «Новая заявка на проверку» по заявкам в статусе pending:
+    #     проверяющим (на проверку) и админам (надзор) — как в реальном потоке ---
     pending = (WriteOff.query
                .filter_by(status=STATUS_PENDING, source=SOURCE_MANUAL)
                .order_by(WriteOff.created_at.desc()).limit(8).all())
     for wo in pending:
         store_name = wo.store.name if wo.store else 'Точка'
-        for rv in reviewers:
-            n = notify(rv.id, NOTIFY_REVIEW_PENDING,
+        for u in reviewers + admins:
+            n = notify(u.id, NOTIFY_REVIEW_PENDING,
                        title='Новая заявка на списание',
                        body=f'{store_name}: {wo.comment}',
                        write_off_id=wo.id, commit=False)

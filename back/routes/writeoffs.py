@@ -107,6 +107,14 @@ def create_write_off():
                 iiko_product_id=item.get('iiko_product_id'),
             ))
 
+        # Уведомления: проверяющим — новая заявка на проверку; админам — надзор.
+        # (раньше ручное создание не уведомляло никого → пустая лента у проверяющих/админов)
+        notify_body = f'{store.name}: {comment}'
+        notify_reviewers(NOTIFY_REVIEW_PENDING, title='Новая заявка на списание',
+                         body=notify_body, write_off_id=wo.id, commit=False)
+        notify_admins(NOTIFY_REVIEW_PENDING, title='Новая заявка на списание',
+                      body=notify_body, write_off_id=wo.id, commit=False)
+
         db.session.commit()
         return jsonify({'write_off': wo.to_dict()}), 201
     except Exception as e:
