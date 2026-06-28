@@ -8,6 +8,10 @@ struct LoginView: View {
     @State private var password = ""
     @State private var error: String?
     @State private var loading = false
+    @State private var showScan = false
+
+    private var bioEnabled: Bool { BiometricStore.isEnabled }
+    private var bioName: String? { BiometricStore.name }
 
     private let demo: [(String, String, String)] = [
         ("role_sender", "sender1", "sender123"),
@@ -32,6 +36,35 @@ struct LoginView: View {
                     BahandiLogo(size: .lg).padding(.top, 12)
                     Text(settings.t("login_title")).font(AppFont.head(25)).foregroundColor(AppColor.text).padding(.top, 26)
                     Text(settings.t("login_sub")).font(.system(size: 14)).foregroundColor(AppColor.muted).padding(.top, 4)
+
+                    if bioEnabled {
+                        Button { showScan = true } label: {
+                            HStack(spacing: 12) {
+                                ZStack { RoundedRectangle(cornerRadius: 13).fill(AppColor.green).frame(width: 48, height: 48)
+                                    Image(systemName: "touchid").font(.system(size: 26)).foregroundColor(.white) }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(settings.t("bio_greet") + (bioName.map { ", \($0)" } ?? ""))
+                                        .font(.system(size: 12)).foregroundColor(AppColor.muted)
+                                    Text(settings.t("bio_login")).font(AppFont.head(16)).foregroundColor(AppColor.green)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundColor(AppColor.green)
+                            }
+                            .padding(14)
+                            .background(AppColor.greenTint)
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppColor.green, lineWidth: 1.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 24)
+
+                        HStack(spacing: 8) {
+                            Rectangle().fill(AppColor.line).frame(height: 1)
+                            Text(settings.lang == "kz" ? "немесе" : "или").font(.system(size: 11.5)).foregroundColor(AppColor.faint).fixedSize()
+                            Rectangle().fill(AppColor.line).frame(height: 1)
+                        }
+                        .padding(.top, 18)
+                    }
 
                     VStack(spacing: 14) {
                         field(icon: "person", title: settings.t("login_login"), text: $identifier, placeholder: settings.t("login_ph_login"))
@@ -78,6 +111,16 @@ struct LoginView: View {
                 .padding(24)
                 .frame(maxWidth: .infinity)
             }
+        }
+        .fullScreenCover(isPresented: $showScan) {
+            BiometricScanView(
+                authenticate: {
+                    guard let creds = BiometricStore.credentials() else { throw APIError(message: "no creds", status: 0) }
+                    try await auth.login(identifier: creds.identifier, password: creds.password)
+                },
+                onCancel: { showScan = false }
+            )
+            .environmentObject(settings)
         }
     }
 

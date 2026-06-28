@@ -31,6 +31,8 @@ const PATHS = {
   sliders: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
   edit: 'M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3ZM13.5 6.5l3 3',
   trash: 'M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6',
+  fingerprint:
+    'M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4 M14 13.12c0 2.38 0 6.38-1 8.88 M17.29 21.02c.12-.6.43-2.3.5-3.02 M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4 M5 19.5C5.5 18 6 15 6 12c0-.7.12-1.37.34-2 M8.65 22c.21-.66.45-1.32.57-2 M9 6.8a6 6 0 0 1 9 5.2v2 M21.8 16c.2-2 .131-5.354 0-6',
 };
 
 export default function Icon({ name, size = 20, strokeWidth = 2, className = '', style }) {

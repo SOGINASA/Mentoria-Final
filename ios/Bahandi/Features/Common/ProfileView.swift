@@ -4,6 +4,9 @@ struct ProfileView: View {
     @EnvironmentObject var settings: AppSettings
     @EnvironmentObject var auth: AuthStore
 
+    @State private var bioOn = BiometricStore.isEnabled
+    @State private var setupOpen = false
+
     private var roleLabel: String {
         switch auth.role {
         case Role.reviewer: return settings.t("role_reviewer")
@@ -53,6 +56,27 @@ struct ProfileView: View {
                         }
                         .pickerStyle(.menu).tint(AppColor.green)
                     }
+                    Divider().background(AppColor.line2)
+                    HStack(spacing: 12) {
+                        Image(systemName: "touchid").font(.system(size: 20)).foregroundColor(bioOn ? AppColor.green : AppColor.muted)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(settings.t("bio_setting")).font(.system(size: 14)).foregroundColor(AppColor.text)
+                            Text(settings.t("bio_setting_sub")).font(.system(size: 11.5)).foregroundColor(AppColor.muted)
+                        }
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { bioOn },
+                            set: { on in
+                                if on {
+                                    setupOpen = true
+                                } else {
+                                    BiometricStore.disable()
+                                    bioOn = false
+                                    settings.showToast(settings.t("bio_disabled_toast"))
+                                }
+                            }
+                        )).labelsHidden().tint(AppColor.green)
+                    }
                 }
                 .padding(16).background(AppColor.surface).overlay(RoundedRectangle(cornerRadius: 16).stroke(AppColor.line, lineWidth: 1)).clipShape(RoundedRectangle(cornerRadius: 16))
 
@@ -69,6 +93,16 @@ struct ProfileView: View {
         .background(AppColor.bg)
         .navigationTitle(settings.t("nav_profile"))
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $setupOpen) {
+            if let user = auth.user {
+                BiometricSetupSheet(user: user, onEnabled: {
+                    bioOn = true
+                    settings.showToast(settings.t("bio_enrolled"))
+                })
+                .environmentObject(settings)
+                .environmentObject(auth)
+            }
+        }
     }
 
     private func infoRow(icon: String, label: String, value: String) -> some View {

@@ -100,3 +100,88 @@ body {
   background: var(--tile-base);
   box-shadow: var(--tile-ring);
 }
+
+/* ===== Биометрия: анимации сканирования ===== */
+.bio-fp {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.bio-fp svg {
+  position: relative;
+  z-index: 2;
+}
+/* мягкое свечение-кольцо за отпечатком */
+.bio-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  z-index: 1;
+}
+.bio-ring::before,
+.bio-ring::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--green);
+  opacity: 0;
+  animation: bioRipple 2s ease-out infinite;
+}
+.bio-ring::after {
+  animation-delay: 1s;
+}
+@keyframes bioRipple {
+  0% { transform: scale(0.7); opacity: 0.45; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+/* линия сканирования, бегущая по отпечатку */
+.bio-scanline {
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  height: 3px;
+  border-radius: 3px;
+  z-index: 3;
+  background: linear-gradient(90deg, transparent, var(--green), transparent);
+  box-shadow: 0 0 14px 3px var(--green);
+  animation: bioScan 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes bioScan {
+  0% { top: 20%; opacity: 0; }
+  15% { opacity: 1; }
+  50% { top: 78%; opacity: 1; }
+  85% { opacity: 1; }
+  100% { top: 20%; opacity: 0; }
+}
+/* гребни отпечатка «дышат» при сканировании */
+.bio-ridge {
+  animation: bioRidge 1.6s ease-in-out infinite;
+}
+@keyframes bioRidge {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.bio-fp.is-success .bio-ridge {
+  animation: none;
+  opacity: 1;
+}
+/* галочка успеха */
+.bio-check path {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: bioCheck 0.5s ease forwards;
+}
+@keyframes bioCheck {
+  to { stroke-dashoffset: 0; }
+}
+.bio-pop {
+  animation: bioPop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes bioPop {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1); opacity: 1; }
+}

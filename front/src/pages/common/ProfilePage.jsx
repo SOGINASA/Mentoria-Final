@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
 import { useI18n } from '../../i18n/useI18n';
@@ -5,6 +6,8 @@ import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { initials } from '../../utils/format';
 import { ROLE_REVIEWER, ROLE_ADMIN } from '../../constants/roles';
+import { isBiometricEnabled, disableBiometric } from '../../lib/biometric';
+import BiometricSetupModal from '../../components/biometric/BiometricSetupModal';
 
 function Toggle({ on, onClick }) {
   return (
@@ -25,13 +28,27 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const { t, lang, setLang } = useI18n();
   const { theme, toggleTheme, notif, toggleNotif } = useUiStore();
+  const showToast = useUiStore((s) => s.showToast);
   const { user, logout } = useAuthStore();
+
+  const [bioOn, setBioOn] = useState(isBiometricEnabled());
+  const [setupOpen, setSetupOpen] = useState(false);
 
   const roleLabel = user?.role === ROLE_REVIEWER ? t.role_reviewer : user?.role === ROLE_ADMIN ? t.role_admin : t.role_sender;
 
   function onLogout() {
     logout();
     navigate('/login', { replace: true });
+  }
+
+  function toggleBiometric() {
+    if (bioOn) {
+      disableBiometric();
+      setBioOn(false);
+      showToast(t.bio_disabled_toast);
+    } else {
+      setSetupOpen(true);
+    }
   }
 
   return (
@@ -91,10 +108,18 @@ export default function ProfilePage() {
           <span className="flex-1 text-sm font-medium text-text">{t.dark_theme}</span>
           <Toggle on={theme === 'dark'} onClick={toggleTheme} />
         </div>
-        <div className="flex items-center gap-3 px-4 py-3.5">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-line2">
           <Icon name="bell" size={20} className="text-muted" />
           <span className="flex-1 text-sm font-medium text-text">{t.notifications}</span>
           <Toggle on={notif} onClick={toggleNotif} />
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          <Icon name="fingerprint" size={20} style={{ color: bioOn ? 'var(--green)' : 'var(--muted)' }} />
+          <div className="flex-1">
+            <div className="text-sm font-medium text-text">{t.bio_setting}</div>
+            <div className="text-[11.5px] text-muted">{t.bio_setting_sub}</div>
+          </div>
+          <Toggle on={bioOn} onClick={toggleBiometric} />
         </div>
       </div>
 
@@ -106,6 +131,18 @@ export default function ProfilePage() {
         <Icon name="logout" size={19} />
         {t.logout}
       </button>
+
+      {setupOpen && (
+        <BiometricSetupModal
+          user={user}
+          onClose={() => setSetupOpen(false)}
+          onEnabled={() => {
+            setSetupOpen(false);
+            setBioOn(true);
+            showToast(t.bio_enrolled);
+          }}
+        />
+      )}
     </div>
   );
 }

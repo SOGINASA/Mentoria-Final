@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../../components/ui/Logo';
 import Icon from '../../components/ui/Icon';
@@ -7,6 +7,8 @@ import { useI18n } from '../../i18n/useI18n';
 import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { HOME_ROUTE_BY_ROLE } from '../../constants/roles';
+import { isBiometricEnabled, getBiometricName, getBiometricCreds } from '../../lib/biometric';
+import BiometricScanOverlay from '../../components/biometric/BiometricScanOverlay';
 
 // Демо-учётки бэкенда (back/seed_data.py)
 const DEMO = {
@@ -25,6 +27,24 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showScan, setShowScan] = useState(false);
+
+  const bioEnabled = isBiometricEnabled();
+  const bioName = getBiometricName();
+
+  const authenticateBiometric = useCallback(async () => {
+    const creds = getBiometricCreds();
+    if (!creds) throw new Error('no creds');
+    return login(creds.identifier, creds.password);
+  }, [login]);
+
+  const onBioSuccess = useCallback(
+    (user) => {
+      setShowScan(false);
+      navigate(HOME_ROUTE_BY_ROLE[user.role] || '/', { replace: true });
+    },
+    [navigate]
+  );
 
   async function submit(creds) {
     const id = creds?.identifier ?? identifier;
@@ -74,6 +94,36 @@ export default function LoginPage() {
           </div>
           <h1 className="font-head font-semibold text-[25px] text-text text-center mt-7 mb-1">{t.login_title}</h1>
           <p className="text-muted text-sm text-center mb-7">{t.login_sub}</p>
+
+          {bioEnabled && (
+            <div className="w-full">
+              <button
+                type="button"
+                onClick={() => setShowScan(true)}
+                className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-[1.5px] border-green cursor-pointer transition hover:brightness-[.98] active:scale-[.99]"
+                style={{ background: 'var(--green-tint)' }}
+              >
+                <span className="w-12 h-12 rounded-xl bg-green text-white grid place-items-center flex-none">
+                  <Icon name="fingerprint" size={26} />
+                </span>
+                <span className="flex-1 text-left">
+                  <span className="block text-[12px] text-muted">
+                    {t.bio_greet}
+                    {bioName ? `, ${bioName}` : ''}
+                  </span>
+                  <span className="block font-head font-semibold text-[16px]" style={{ color: 'var(--green)' }}>
+                    {t.bio_login}
+                  </span>
+                </span>
+                <Icon name="chevronRight" size={20} style={{ color: 'var(--green)' }} />
+              </button>
+              <div className="flex items-center gap-2 my-5">
+                <span className="flex-1 h-px bg-line" />
+                <span className="text-[11.5px] text-faint">{lang === 'kz' ? 'немесе' : 'или'}</span>
+                <span className="flex-1 h-px bg-line" />
+              </div>
+            </div>
+          )}
 
           <form
             className="w-full flex flex-col gap-3.5"
@@ -162,6 +212,10 @@ export default function LoginPage() {
           </form>
         </div>
       </div>
+
+      {showScan && (
+        <BiometricScanOverlay onAuthenticate={authenticateBiometric} onSuccess={onBioSuccess} onCancel={() => setShowScan(false)} />
+      )}
     </div>
   );
 }
