@@ -113,7 +113,8 @@ struct LoginView: View {
         .fullScreenCover(isPresented: $showScan) {
             BiometricScanView(
                 enrolled: bioEnabled,
-                authenticate: {
+                verifyBiometric: { try await BiometricAuth.authenticate(reason: settings.t("bio_login")) },
+                completeLogin: {
                     guard let creds = BiometricStore.credentials() else { throw APIError(message: "no creds", status: 0) }
                     try await auth.login(identifier: creds.identifier, password: creds.password)
                 },

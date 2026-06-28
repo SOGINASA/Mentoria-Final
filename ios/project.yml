@@ -42,6 +42,7 @@ targets:
           - UIInterfaceOrientationPortrait
         NSCameraUsageDescription: "Камера нужна, чтобы сфотографировать списываемую продукцию."
         NSPhotoLibraryUsageDescription: "Доступ к фото нужен, чтобы прикрепить снимок к заявке на списание."
+        NSFaceIDUsageDescription: "Face ID используется для быстрого и безопасного входа в приложение."
         # Dev-режим: разрешаем http к localhost / LAN / временному хосту.
         # Для App Store ограничить (оставить только нужный домен с https).
         NSAppTransportSecurity:

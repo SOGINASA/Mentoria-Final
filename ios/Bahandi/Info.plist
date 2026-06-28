@@ -31,6 +31,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Камера нужна, чтобы сфотографировать списываемую продукцию.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Face ID используется для быстрого и безопасного входа в приложение.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Доступ к фото нужен, чтобы прикрепить снимок к заявке на списание.</string>
 	<key>UILaunchScreen</key>

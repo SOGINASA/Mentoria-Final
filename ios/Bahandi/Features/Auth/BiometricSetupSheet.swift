@@ -85,24 +85,34 @@ struct BiometricSetupSheet: View {
 
     private func confirm() {
         guard !password.isEmpty, !busy else { return }
+        guard BiometricAuth.isAvailable() else { error = settings.t("bio_unsupported"); return }
         busy = true; error = nil
         Task {
+            // 1) проверяем пароль реальным логином (и обновляем токен)
             do {
-                try await auth.login(identifier: user.username, password: password) // проверка пароля
-                BiometricStore.enable(identifier: user.username, name: user.fullName, password: password)
-                withAnimation { phase = .enrolling }
-                try? await Task.sleep(nanoseconds: 1_600_000_000)
-                withAnimation { phase = .done }
-                try? await Task.sleep(nanoseconds: 900_000_000)
-                onEnabled()
-                dismiss()
+                try await auth.login(identifier: user.username, password: password)
             } catch let e as APIError {
                 error = (e.status == 401 || e.status == 403) ? settings.t("bio_wrong_pass") : e.message
-                busy = false
+                busy = false; return
             } catch {
-                self.error = settings.t("error_generic")
-                busy = false
+                self.error = settings.t("error_generic"); busy = false; return
             }
+            // 2) подтверждаем настоящей биометрией (Face ID / Touch ID)
+            do {
+                try await BiometricAuth.authenticate(reason: settings.t("bio_enroll_face"))
+            } catch is BiometricCancelled {
+                busy = false; return
+            } catch {
+                self.error = settings.t("bio_unsupported"); busy = false; return
+            }
+            // 3) сохраняем + анимация
+            BiometricStore.enable(identifier: user.username, name: user.fullName, password: password)
+            withAnimation { phase = .enrolling }
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            withAnimation { phase = .done }
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            onEnabled()
+            dismiss()
         }
     }
 }

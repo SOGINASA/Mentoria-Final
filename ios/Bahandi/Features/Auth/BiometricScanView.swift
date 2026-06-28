@@ -1,11 +1,13 @@
 import SwiftUI
 
-// Полноэкранный сканер входа по биометрии.
-// authenticate: выполняет реальный вход (флипает auth.status). Вызывается после анимации.
+// Полноэкранный вход по биометрии:
+// 1) verifyBiometric() — системный Face ID / Touch ID;
+// 2) completeLogin()   — вход через бэкенд (/auth/login по кредам из Keychain).
 struct BiometricScanView: View {
     @EnvironmentObject var settings: AppSettings
     var enrolled: Bool = true
-    let authenticate: () async throws -> Void
+    let verifyBiometric: () async throws -> Void
+    let completeLogin: () async throws -> Void
     let onCancel: () -> Void
 
     @State private var phase: BioPhase = .scanning
@@ -77,15 +79,23 @@ struct BiometricScanView: View {
 
     private func run() {
         task?.cancel()
+        guard enrolled else { phase = .error; return }
         phase = .scanning
         task = Task {
-            try? await Task.sleep(nanoseconds: 1_300_000_000)
+            do {
+                try await verifyBiometric() // системный Face ID / Touch ID
+            } catch is BiometricCancelled {
+                onCancel(); return
+            } catch {
+                if !Task.isCancelled { withAnimation { phase = .error } }
+                return
+            }
             if Task.isCancelled { return }
             withAnimation(.spring(duration: 0.35)) { phase = .success }
             try? await Task.sleep(nanoseconds: 800_000_000)
             if Task.isCancelled { return }
             do {
-                try await authenticate() // успех → auth.status флипается, экран сменится
+                try await completeLogin() // вход через бэкенд → auth.status флипается
             } catch {
                 if !Task.isCancelled { withAnimation { phase = .error } }
             }
