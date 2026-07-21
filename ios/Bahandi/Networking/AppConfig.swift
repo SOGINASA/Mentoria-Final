@@ -19,7 +19,7 @@ enum AppConfig {
     // ─────────────────────────────────────────────────────────────────────
 
     /// Боевой адрес бэкенда (общий с веб-версией). Клиент обращается к `<baseURL>/api`.
-    static let productionBaseURL = "https://foodtrack.beast-inside.kz/mentoria"
+    static let productionBaseURL = "https://foodtrack.beast-inside.kz/bahandi"
 
     /// LAN-адрес Mac с бэкендом (для запуска на реальном iPhone в той же сети).
     /// Узнать IP: в терминале `ipconfig getifaddr en0`.
