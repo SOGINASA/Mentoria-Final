@@ -53,6 +53,8 @@ services:
     container_name: writeoff-frontend
     ports:
       - "3000:3000"
+    env_file:
+      - ./front/.env
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/"]
