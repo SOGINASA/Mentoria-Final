@@ -21,6 +21,31 @@ def public_url(filename):
     return f"{base}/uploads/{filename}"
 
 
+def normalize_photo_url(url):
+    """Пересобирает ссылку на НАШЕ фото от текущего API_BASE_URL.
+
+    В БД лежит абсолютный URL, собранный из API_BASE_URL на момент загрузки.
+    Если адрес бэка поменялся (домен, порт, префикс за nginx) — все старые
+    строки начинают указывать «в никуда», и фото перестают открываться.
+    Причём молча: за фронтовым nginx с SPA-фолбэком такой запрос вернёт 200 и
+    index.html, браузер покажет битую картинку и НИЧЕГО не напишет в консоль.
+    Поэтому на выдаче берём из ссылки только имя файла и клеим актуальную базу.
+
+    Чужие ссылки (демо-заглушки placehold.co и т.п.) не трогаем — у них нет
+    сегмента /uploads/.
+    """
+    if not url:
+        return url
+    marker = '/uploads/'
+    idx = url.rfind(marker)
+    if idx == -1:
+        return url
+    filename = url[idx + len(marker):].split('?', 1)[0].split('#', 1)[0]
+    if not filename or '/' in filename:
+        return url
+    return public_url(filename)
+
+
 def save_image_file(file):
     """Сохраняет werkzeug FileStorage в папку загрузок.
     Возвращает (url, filename). Бросает ValueError при пустом/недопустимом файле."""

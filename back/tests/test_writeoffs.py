@@ -22,6 +22,28 @@ def test_create_write_off(client, sender, store, auth):
     assert len(wo['photos']) == 1
 
 
+def test_photo_url_rebuilt_from_api_base_url(client, sender, store, auth, app):
+    """Ссылка на фото всегда собирается от текущего API_BASE_URL.
+
+    Иначе после переезда бэка (другой домен/префикс за nginx) старые заявки
+    отдают мёртвые ссылки и картинки молча не грузятся."""
+    payload = _create_payload(store)
+    payload['photo_urls'] = ['https://old-host.example.com/uploads/abc123.jpg']
+    resp = client.post('/api/write-offs', headers=auth(sender), json=payload)
+    assert resp.status_code == 201
+    base = app.config['API_BASE_URL'].rstrip('/')
+    assert resp.get_json()['write_off']['photos'][0]['url'] == f'{base}/uploads/abc123.jpg'
+
+
+def test_external_photo_url_kept_as_is(client, sender, store, auth):
+    """Чужие ссылки (демо-заглушки) не трогаем — в них нет сегмента /uploads/."""
+    payload = _create_payload(store)
+    payload['photo_urls'] = ['https://placehold.co/600x400?text=Demo']
+    resp = client.post('/api/write-offs', headers=auth(sender), json=payload)
+    assert resp.status_code == 201
+    assert resp.get_json()['write_off']['photos'][0]['url'] == 'https://placehold.co/600x400?text=Demo'
+
+
 def test_create_requires_min_comment(client, sender, store, auth):
     payload = _create_payload(store)
     payload['comment'] = 'кратко'  # < 10 символов
