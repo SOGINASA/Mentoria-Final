@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required
 from sqlalchemy import func
 
-from models import db, WriteOff, WriteOffPhoto, WriteOffItem, Store, Employee
+from models import db, WriteOff, WriteOffPhoto, WriteOffItem, WriteOffDeduction, Store, Employee
 from utils.auth_helpers import get_current_user, role_required
 from utils.validators import parse_date
 from utils.request_helpers import get_pagination
@@ -27,10 +27,58 @@ writeoffs_bp = Blueprint('writeoffs', __name__)
 
 
 def _can_view(user, wo):
-    """Отправитель видит только свои заявки; проверяющий/админ — любые."""
-    if user.role in (ROLE_REVIEWER, ROLE_ADMIN):
+    """Отправитель видит только свои заявки; админ — любые;
+    супервайзер — заявки своих точек (если точки назначены)."""
+    if user.role == ROLE_ADMIN:
         return True
+    if user.role == ROLE_REVIEWER:
+        sup_ids = _supervised_store_ids(user)
+        return sup_ids is None or wo.store_id in sup_ids
     return wo.author_id == user.id
+
+
+def _supervised_store_ids(user):
+    """id точек под надзором супервайзера, либо None (без ограничения:
+    админ/отправитель или супервайзер без назначенных точек — видит все)."""
+    if user.role != ROLE_REVIEWER:
+        return None
+    ids = [s.id for s in user.supervised_stores]
+    return ids or None
+
+
+def _resolve_deduction_ids(data, store):
+    """Список сотрудников для удержания. Учитывает режим «со всех на точке»
+    (deduct_all), мультивыбор (deduction_employee_ids) и legacy-одиночного
+    (deduction_employee_id). Возвращает (ids, deduct_all, error)."""
+    deduct_all = bool(data.get('deduct_all'))
+    if deduct_all:
+        emps = Employee.query.filter_by(store_id=store.id, is_active=True).all()
+        if not emps:
+            return None, deduct_all, 'На точке нет активных сотрудников для удержания'
+        return [e.id for e in emps], deduct_all, None
+
+    ids = data.get('deduction_employee_ids')
+    if not ids:
+        single = data.get('deduction_employee_id')
+        ids = [single] if single else []
+    try:
+        ids = [int(i) for i in ids if i]
+    except (TypeError, ValueError):
+        return None, deduct_all, 'Неверный список сотрудников'
+    if not ids:
+        return None, deduct_all, 'При удержании выберите хотя бы одного сотрудника'
+
+    found = {e.id: e for e in Employee.query.filter(
+        Employee.id.in_(ids), Employee.is_active.is_(True)).all()}
+    seen = []
+    for i in ids:
+        if i not in found:
+            return None, deduct_all, 'Один из выбранных сотрудников не найден'
+        if found[i].store_id and found[i].store_id != store.id:
+            return None, deduct_all, 'Сотрудник не относится к выбранной точке'
+        if i not in seen:
+            seen.append(i)
+    return seen, deduct_all, None
 
 
 # --------------------------------------------------------------------------- #
@@ -57,15 +105,13 @@ def create_write_off():
     if wo_type not in WRITEOFF_TYPES:
         return jsonify({'error': 'Неверный тип списания'}), 400
 
-    # --- сотрудник для удержания (условно) ---
-    deduction_employee_id = None
+    # --- сотрудники для удержания (условно, мультивыбор / со всех на точке) ---
+    deduction_ids = []
+    deduct_all = False
     if wo_type == TYPE_WITH_DEDUCTION:
-        deduction_employee_id = data.get('deduction_employee_id')
-        emp = Employee.query.filter_by(id=deduction_employee_id, is_active=True).first() if deduction_employee_id else None
-        if not emp:
-            return jsonify({'error': 'При удержании нужно выбрать сотрудника'}), 400
-        if emp.store_id and emp.store_id != store.id:
-            return jsonify({'error': 'Сотрудник не относится к выбранной точке'}), 400
+        deduction_ids, deduct_all, err = _resolve_deduction_ids(data, store)
+        if err:
+            return jsonify({'error': err}), 400
 
     # --- комментарий (обязательный, мин. 10 символов) ---
     comment = (data.get('comment') or '').strip()
@@ -82,13 +128,17 @@ def create_write_off():
             author_id=user.id,
             store_id=store.id,
             type=wo_type,
-            deduction_employee_id=deduction_employee_id,
+            deduction_employee_id=(deduction_ids[0] if deduction_ids else None),
+            deduct_all=deduct_all,
             comment=comment,
             status=STATUS_PENDING,
             source=SOURCE_MANUAL,
         )
         db.session.add(wo)
         db.session.flush()
+
+        for eid in deduction_ids:
+            db.session.add(WriteOffDeduction(write_off_id=wo.id, employee_id=eid))
 
         for url in photo_urls:
             if url:
@@ -111,7 +161,7 @@ def create_write_off():
         # (раньше ручное создание не уведомляло никого → пустая лента у проверяющих/админов)
         notify_body = f'{store.name}: {comment}'
         notify_reviewers(NOTIFY_REVIEW_PENDING, title='Новая заявка на списание',
-                         body=notify_body, write_off_id=wo.id, commit=False)
+                         body=notify_body, write_off_id=wo.id, commit=False, store_id=store.id)
         notify_admins(NOTIFY_REVIEW_PENDING, title='Новая заявка на списание',
                       body=notify_body, write_off_id=wo.id, commit=False)
 
@@ -198,7 +248,7 @@ def create_fall_draft():
         notify_admins(NOTIFY_FALL_ALERT, title='Зафиксировано падение продукта',
                       body=alert_body, write_off_id=wo.id, commit=False)
         notify_reviewers(NOTIFY_FALL_ALERT, title='Зафиксировано падение продукта',
-                         body=alert_body, write_off_id=wo.id, commit=False)
+                         body=alert_body, write_off_id=wo.id, commit=False, store_id=user.store_id)
 
         db.session.commit()
         return jsonify({'write_off': wo.to_dict()}), 201
@@ -239,15 +289,18 @@ def confirm_draft(wo_id):
         if new_type not in WRITEOFF_TYPES:
             return jsonify({'error': 'Неверный тип списания'}), 400
         wo.type = new_type
+        # Пересобираем список удержаний (мультивыбор / со всех на точке)
+        WriteOffDeduction.query.filter_by(write_off_id=wo.id).delete()
         if new_type == TYPE_WITH_DEDUCTION:
-            emp_id = data.get('deduction_employee_id')
-            emp = Employee.query.filter_by(id=emp_id, is_active=True).first() if emp_id else None
-            if not emp:
-                return jsonify({'error': 'При удержании нужно выбрать сотрудника'}), 400
-            if emp.store_id and emp.store_id != wo.store_id:
-                return jsonify({'error': 'Сотрудник не относится к точке заявки'}), 400
-            wo.deduction_employee_id = emp.id
+            deduction_ids, deduct_all, err = _resolve_deduction_ids(data, wo.store)
+            if err:
+                return jsonify({'error': err}), 400
+            wo.deduct_all = deduct_all
+            wo.deduction_employee_id = deduction_ids[0] if deduction_ids else None
+            for eid in deduction_ids:
+                db.session.add(WriteOffDeduction(write_off_id=wo.id, employee_id=eid))
         else:
+            wo.deduct_all = False
             wo.deduction_employee_id = None
 
     wo.status = STATUS_PENDING
@@ -257,7 +310,7 @@ def confirm_draft(wo_id):
         NOTIFY_REVIEW_PENDING,
         title='Новая заявка на списание (падение)',
         body=f'{wo.store.name if wo.store else "Точка"}: {wo.comment}',
-        write_off_id=wo.id, commit=False,
+        write_off_id=wo.id, commit=False, store_id=wo.store_id,
     )
     db.session.commit()
     return jsonify({'write_off': wo.to_dict()})
@@ -279,6 +332,11 @@ def list_write_offs():
     # Видимость по роли
     if user.role == ROLE_SENDER or request.args.get('scope') == 'mine':
         query = query.filter(WriteOff.author_id == user.id)
+
+    # Супервайзер видит только свои точки (если они назначены)
+    sup_ids = _supervised_store_ids(user)
+    if sup_ids is not None:
+        query = query.filter(WriteOff.store_id.in_(sup_ids))
 
     # Фильтр по статусу
     status = request.args.get('status')
@@ -444,6 +502,10 @@ def stats():
     if user.role == ROLE_SENDER or request.args.get('scope') == 'mine':
         query = query.filter(WriteOff.author_id == user.id)
 
+    sup_ids = _supervised_store_ids(user)
+    if sup_ids is not None:
+        query = query.filter(WriteOff.store_id.in_(sup_ids))
+
     counts = dict(query.group_by(WriteOff.status).all())
     draft = counts.get(STATUS_DRAFT, 0)
     pending = counts.get(STATUS_PENDING, 0)
@@ -476,14 +538,21 @@ def analytics():
 
     Деньги — ОЦЕНКА: count × ANALYTICS_AVG_LOSS (реальной цены в данных нет).
     """
+    user = get_current_user()
     days = request.args.get('days', default=7, type=int) or 7
     days = max(1, min(days, 90))
     store_id = request.args.get('store_id', type=int)
     avg_loss = int(current_app.config.get('ANALYTICS_AVG_LOSS', 1500))
 
+    # Супервайзер видит аналитику только по своим точкам (если назначены)
+    sup_ids = _supervised_store_ids(user)
+
     def scoped(query):
-        """Общие фильтры аналитики: без черновиков + опц. по точке."""
+        """Общие фильтры аналитики: без черновиков + опц. по точке +
+        ограничение супервайзера его точками."""
         query = query.filter(WriteOff.status != STATUS_DRAFT)
+        if sup_ids is not None:
+            query = query.filter(WriteOff.store_id.in_(sup_ids))
         if store_id:
             query = query.filter(WriteOff.store_id == store_id)
         return query
@@ -519,13 +588,14 @@ def analytics():
         for sid, name, cnt in store_rows
     ]
 
-    # --- Топ сотрудников по удержаниям ---
+    # --- Топ сотрудников по удержаниям (через таблицу мультиудержаний) ---
     emp_rows = (
-        scoped(db.session.query(Employee.id, Employee.full_name, func.count(WriteOff.id))
-               .join(WriteOff, WriteOff.deduction_employee_id == Employee.id)
+        scoped(db.session.query(Employee.id, Employee.full_name, func.count(WriteOffDeduction.id))
+               .join(WriteOffDeduction, WriteOffDeduction.employee_id == Employee.id)
+               .join(WriteOff, WriteOff.id == WriteOffDeduction.write_off_id)
                .filter(WriteOff.type == TYPE_WITH_DEDUCTION))
         .group_by(Employee.id, Employee.full_name)
-        .order_by(func.count(WriteOff.id).desc())
+        .order_by(func.count(WriteOffDeduction.id).desc())
         .limit(6).all()
     )
     by_employee = [

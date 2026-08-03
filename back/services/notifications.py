@@ -17,9 +17,23 @@ def notify(user_id, kind, title, body=None, write_off_id=None, commit=True):
     return n
 
 
-def notify_reviewers(kind, title, body=None, write_off_id=None, commit=True):
-    """Создать уведомление для всех активных проверяющих."""
-    return _notify_role(ROLE_REVIEWER, kind, title, body, write_off_id, commit)
+def notify_reviewers(kind, title, body=None, write_off_id=None, commit=True, store_id=None):
+    """Создать уведомление для активных проверяющих. Если задан store_id —
+    только тем супервайзерам, которые надзирают за этой точкой (супервайзеры без
+    назначенных точек получают всё)."""
+    recipients = User.query.filter_by(role=ROLE_REVIEWER, is_active=True).all()
+    if store_id is not None:
+        recipients = [
+            u for u in recipients
+            if not u.supervised_stores or any(s.id == store_id for s in u.supervised_stores)
+        ]
+    created = [
+        notify(u.id, kind, title, body=body, write_off_id=write_off_id, commit=False)
+        for u in recipients
+    ]
+    if commit:
+        db.session.commit()
+    return created
 
 
 def notify_admins(kind, title, body=None, write_off_id=None, commit=True):

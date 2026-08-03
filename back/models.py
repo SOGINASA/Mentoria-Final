@@ -12,6 +12,14 @@ from constants import (
 db = SQLAlchemy()
 
 
+# Точки, закреплённые за супервайзером (проверяющим). Пусто → видит все точки.
+supervisor_stores = db.Table(
+    'supervisor_stores',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), primary_key=True),
+    db.Column('store_id', db.Integer, db.ForeignKey('stores.id', ondelete='CASCADE'), primary_key=True),
+)
+
+
 def _utc_iso(dt):
     """datetime -> ISO-строка с суффиксом Z для UTC."""
     if dt is None:
@@ -48,6 +56,8 @@ class User(db.Model):
     last_login = db.Column(db.DateTime)
 
     store = db.relationship('Store', foreign_keys=[store_id])
+    # Точки под надзором супервайзера (только для роли reviewer). Пусто = все точки.
+    supervised_stores = db.relationship('Store', secondary=supervisor_stores, lazy='selectin')
     write_offs = db.relationship(
         'WriteOff', backref='author', lazy='dynamic',
         foreign_keys='WriteOff.author_id', cascade='all, delete-orphan'
@@ -71,6 +81,8 @@ class User(db.Model):
             'role': self.role,
             'store_id': self.store_id,
             'store': self.store.to_dict() if self.store else None,
+            'supervised_store_ids': [s.id for s in self.supervised_stores],
+            'supervised_stores': [s.to_dict() for s in self.supervised_stores],
             'is_active': self.is_active,
             'created_at': _utc_iso(self.created_at),
             'last_login': _utc_iso(self.last_login),
@@ -137,8 +149,12 @@ class WriteOff(db.Model):
     store_id = db.Column(db.Integer, db.ForeignKey('stores.id'), nullable=False, index=True)
 
     type = db.Column(db.String(20), nullable=False, default=TYPE_NO_DEDUCTION)  # no_deduction|with_deduction
-    # Сотрудник, с которого удержание (только при type=with_deduction)
+    # Сотрудник, с которого удержание (только при type=with_deduction).
+    # Legacy-поле: хранит «первого» сотрудника для обратной совместимости; полный
+    # список — в связи deductions (таблица write_off_deductions).
     deduction_employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=True)
+    # Флаг «удержать со всех сотрудников точки» (снимок сотрудников кладётся в deductions)
+    deduct_all = db.Column(db.Boolean, default=False, nullable=False)
 
     comment = db.Column(db.Text, nullable=False)  # обязательный, мин. 10 символов (валидация в роуте)
     status = db.Column(db.String(20), nullable=False, default=STATUS_PENDING, index=True)
@@ -162,6 +178,10 @@ class WriteOff(db.Model):
     store = db.relationship('Store', foreign_keys=[store_id])
     reviewer = db.relationship('User', foreign_keys=[reviewer_id])
     deduction_employee = db.relationship('Employee', foreign_keys=[deduction_employee_id])
+    # Полный список сотрудников для удержания (мультивыбор / «со всех на точке»)
+    deductions = db.relationship(
+        'WriteOffDeduction', backref='write_off', lazy='joined', cascade='all, delete-orphan'
+    )
     photos = db.relationship(
         'WriteOffPhoto', backref='write_off', lazy='joined', cascade='all, delete-orphan'
     )
@@ -179,6 +199,10 @@ class WriteOff(db.Model):
             'source': self.source,
             'deduction_employee_id': self.deduction_employee_id,
             'deduction_employee': self.deduction_employee.to_dict() if self.deduction_employee else None,
+            'deduct_all': self.deduct_all,
+            'deduction_employees': [d.employee.to_dict() for d in self.deductions if d.employee],
+            # Название товара для карточек/деталей (первая позиция списания)
+            'product_name': self.items[0].product_name if self.items else None,
             'comment': self.comment,
             'status': self.status,
             'reviewer_id': self.reviewer_id,
@@ -239,6 +263,29 @@ class WriteOffItem(db.Model):
             'quantity': self.quantity,
             'unit': self.unit,
             'iiko_product_id': self.iiko_product_id,
+        }
+
+
+class WriteOffDeduction(db.Model):
+    """Сотрудник, с которого удерживается сумма по заявке. Одна заявка может
+    удерживать с нескольких сотрудников (мультивыбор или «со всех на точке»)."""
+    __tablename__ = 'write_off_deductions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    write_off_id = db.Column(db.Integer, db.ForeignKey('write_offs.id'), nullable=False, index=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False, index=True)
+
+    employee = db.relationship('Employee', foreign_keys=[employee_id])
+
+    __table_args__ = (
+        db.UniqueConstraint('write_off_id', 'employee_id', name='uq_writeoff_employee'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'employee_id': self.employee_id,
+            'employee': self.employee.to_dict() if self.employee else None,
         }
 
 

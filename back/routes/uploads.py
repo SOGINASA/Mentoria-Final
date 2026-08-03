@@ -1,9 +1,10 @@
 """Загрузка фото продукции. Файлы сохраняются в static/uploads,
 наружу отдаётся публичный URL (см. отдачу в app.py).
 
-При загрузке фото сразу прогоняется через модели распознавания (тип продукта +
-испорченность) — результат возвращается в поле recognition, чтобы фронт мог
-показать подсказку и автозаполнить причину списания."""
+Распознавание (тип продукта + испорченность) — отдельный шаг. По умолчанию
+загрузка НЕ ждёт инференс модели (это медленно): клиент отправляет recognize=0,
+получает url мгновенно и запрашивает вердикт ИИ фоново через /uploads/recognize.
+Без recognize=0 распознавание идёт синхронно (обратная совместимость)."""
 
 import os
 
@@ -16,12 +17,20 @@ from services import recognition
 uploads_bp = Blueprint('uploads', __name__)
 
 
+def _truthy(v, default=True):
+    if v is None:
+        return default
+    return str(v).strip().lower() not in ('0', 'false', 'no', '')
+
+
 @uploads_bp.route('/photo', methods=['POST'])
 @jwt_required()
 def upload_photo():
     """Принимает multipart-форму с полем 'file'.
+    Поле 'recognize' (опц.): '0' → пропустить инференс (быстро), вердикт ИИ
+    запрашивается отдельно через /uploads/recognize.
     Возвращает {url, filename, recognition}. recognition = None, если
-    распознавание выключено/недоступно (загрузка при этом не ломается)."""
+    распознавание отложено/выключено/недоступно (загрузка при этом не ломается)."""
     if 'file' not in request.files:
         return jsonify({'error': 'Файл не передан (ожидается поле file)'}), 400
 
@@ -30,8 +39,29 @@ def upload_photo():
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
 
-    # Распознавание (best-effort: ошибки не должны рушить загрузку).
-    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-    result = recognition.recognize(file_path)
+    result = None
+    if _truthy(request.form.get('recognize'), default=True):
+        # Синхронный режим (best-effort: ошибки не должны рушить загрузку).
+        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+        result = recognition.recognize(file_path)
 
     return jsonify({'url': url, 'filename': filename, 'recognition': result}), 201
+
+
+@uploads_bp.route('/recognize', methods=['POST'])
+@jwt_required()
+def recognize_photo():
+    """Прогоняет уже загруженный файл через модели распознавания.
+    Тело (JSON): {filename}. Возвращает {recognition} (или null, если ИИ
+    недоступен/файла нет). Вызывается фоново после быстрой загрузки."""
+    data = request.get_json(silent=True) or {}
+    filename = os.path.basename((data.get('filename') or '').strip())
+    if not filename:
+        return jsonify({'error': 'Не указан filename'}), 400
+
+    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    if not os.path.isfile(file_path):
+        return jsonify({'error': 'Файл не найден'}), 404
+
+    result = recognition.recognize(file_path)
+    return jsonify({'recognition': result})

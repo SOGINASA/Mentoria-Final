@@ -24,6 +24,8 @@ struct CreateWriteOffView: View {
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showCamera = false
 
+    @StateObject private var speech = SpeechDictation()
+
     private let minComment = 10
     private let maxPhotos = 4
 
@@ -98,6 +100,8 @@ struct CreateWriteOffView: View {
         .task(id: wtype) {
             if wtype == WType.withDeduction { await store.loadEmployees(storeId: storeId) }
         }
+        .onChange(of: cur) { _, step in if step != "comment" { speech.stop() } }
+        .onDisappear { speech.stop() }
     }
 
     // MARK: контент шага
@@ -215,15 +219,26 @@ struct CreateWriteOffView: View {
             // Название товара — только фронт (бэк подвяжем позже через items)
             VStack(alignment: .leading, spacing: 7) {
                 Text(settings.t("f_product")).font(.system(size: 13, weight: .semibold)).foregroundColor(AppColor.text)
-                TextField(settings.t("f_product_ph"), text: $productName)
-                    .font(.system(size: 15)).foregroundColor(AppColor.text)
-                    .padding(.horizontal, 14).frame(height: 48)
-                    .background(AppColor.surface)
-                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(AppColor.line, lineWidth: 1.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                HStack(spacing: 10) {
+                    TextField(settings.t("f_product_ph"), text: $productName)
+                        .font(.system(size: 15)).foregroundColor(AppColor.text)
+                    micButton(.name)
+                }
+                .padding(.horizontal, 14).frame(height: 48)
+                .background(AppColor.surface)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(borderColor(.name), lineWidth: 1.5))
+                .clipShape(RoundedRectangle(cornerRadius: 13))
             }
 
+            // Подсказка / статус голосового ввода
+            voiceStatus
+
             VStack(spacing: 8) {
+                HStack {
+                    Text(settings.t("step_comment")).font(.system(size: 13, weight: .semibold)).foregroundColor(AppColor.text)
+                    Spacer()
+                    micButton(.comment)
+                }
                 TextEditor(text: $comment)
                     .frame(minHeight: 120).scrollContentBackground(.hidden)
                     .font(.system(size: 15)).foregroundColor(AppColor.text)
@@ -324,6 +339,59 @@ struct CreateWriteOffView: View {
             Text(value).font(.system(size: 13, weight: .semibold)).foregroundColor(AppColor.text) }
     }
 
+    // MARK: голосовой ввод
+    private func borderColor(_ field: SpeechDictation.Field) -> Color {
+        (speech.activeField == field && speech.listening) ? AppColor.green : AppColor.line
+    }
+
+    @ViewBuilder private func micButton(_ field: SpeechDictation.Field) -> some View {
+        if speech.supported {
+            let on = speech.activeField == field && speech.listening
+            Button {
+                let current = field == .name ? productName : comment
+                let apply: (String) -> Void = field == .name ? { productName = $0 } : { comment = $0 }
+                speech.toggle(field, lang: settings.lang, current: current, apply: apply)
+            } label: {
+                ZStack {
+                    Circle().fill(on ? AppColor.red : AppColor.greenTint).frame(width: 36, height: 36)
+                    Image(systemName: on ? "stop.fill" : "mic.fill")
+                        .font(.system(size: on ? 13 : 15, weight: .semibold))
+                        .foregroundColor(on ? .white : AppColor.green)
+                        .symbolEffect(.variableColor.iterative, options: .repeating, isActive: on)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(on ? settings.t("voice_stop")
+                                   : settings.t(field == .name ? "voice_name" : "voice_comment"))
+        }
+    }
+
+    @ViewBuilder private var voiceStatus: some View {
+        if speech.listening {
+            HStack(spacing: 10) {
+                Image(systemName: "waveform").font(.system(size: 16, weight: .semibold))
+                    .symbolEffect(.variableColor.iterative, options: .repeating, isActive: true)
+                Text(settings.t("voice_listening")).font(.system(size: 12.5, weight: .semibold))
+            }
+            .foregroundColor(AppColor.red)
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppColor.redTint).clipShape(RoundedRectangle(cornerRadius: 12))
+        } else if speech.errorKind == "denied" {
+            Text(settings.t("voice_denied")).font(.system(size: 12.5, weight: .medium))
+                .foregroundColor(AppColor.red).frame(maxWidth: .infinity, alignment: .leading)
+        } else if speech.errorKind == "unsupported" {
+            Text(settings.t("voice_unsupported")).font(.system(size: 12.5))
+                .foregroundColor(AppColor.muted).frame(maxWidth: .infinity, alignment: .leading)
+        } else if speech.supported {
+            HStack(spacing: 6) {
+                Image(systemName: "mic.fill").font(.system(size: 12)).foregroundColor(AppColor.green)
+                Text(settings.t("voice_hint")).font(.system(size: 12.5)).foregroundColor(AppColor.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     // MARK: действия
     private func upload(_ data: Data) async {
         uploading = true; error = nil
@@ -369,6 +437,7 @@ struct CreateWriteOffView: View {
     }
 
     private func reset() {
+        speech.stop()
         stepIndex = 0; photos = []; storeId = auth.user?.storeId; wtype = ""; employeeId = nil; comment = ""; productName = ""; empQuery = ""
     }
 }

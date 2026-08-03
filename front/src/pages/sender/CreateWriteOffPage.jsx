@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
 import Spinner from '../../components/ui/Spinner';
+import MicButton, { ListeningBar } from '../../components/ui/MicButton';
+import { useVoiceDictation } from '../../hooks/useVoiceDictation';
 import { useI18n } from '../../i18n/useI18n';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
@@ -12,7 +14,8 @@ import { initials } from '../../utils/format';
 
 export default function CreateWriteOffPage() {
   const navigate = useNavigate();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const voice = useVoiceDictation(lang);
   const user = useAuthStore((s) => s.user);
   const showToast = useUiStore((s) => s.showToast);
   const { stores, employees, loadStores, loadEmployees, create, acting } = useWriteOffStore();
@@ -54,6 +57,11 @@ export default function CreateWriteOffPage() {
 
   const cur = steps[Math.min(stepIndex, steps.length - 1)];
   const isLast = stepIndex >= steps.length - 1;
+
+  // Уходим с шага комментария — глушим микрофон
+  useEffect(() => {
+    if (cur !== 'comment' && voice.listening) voice.stop();
+  }, [cur, voice.listening]); // eslint-disable-line react-hooks/exhaustive-deps
   const commentLen = comment.trim().length;
   const store = stores.find((s) => s.id === storeId);
   const employee = employees.find((e) => e.id === employeeId);
@@ -300,15 +308,54 @@ export default function CreateWriteOffPage() {
             {/* Название товара — только фронт (бэк подвяжем позже через items) */}
             <label className="flex flex-col gap-1.5 mb-3">
               <span className="text-[13px] font-semibold text-text">{t.f_product}</span>
-              <input
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder={t.f_product_ph}
-                className="h-12 bg-surface border-[1.5px] border-line rounded-2xl px-3.5 outline-none text-[15px] text-text focus:border-green transition-colors"
-              />
+              <div className="relative">
+                <input
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  placeholder={t.f_product_ph}
+                  className="w-full h-12 bg-surface border-[1.5px] border-line rounded-2xl pl-3.5 pr-[54px] outline-none text-[15px] text-text focus:border-green transition-colors"
+                  style={{ borderColor: voice.activeField === 'name' && voice.listening ? 'var(--green)' : undefined }}
+                />
+                <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+                  <MicButton
+                    active={voice.activeField === 'name'}
+                    listening={voice.listening}
+                    supported={voice.supported}
+                    title={voice.activeField === 'name' && voice.listening ? t.voice_stop : t.voice_name}
+                    onClick={() => voice.toggle('name', productName, setProductName)}
+                  />
+                </div>
+              </div>
             </label>
 
-            <div className="bg-surface border-[1.5px] border-line rounded-2xl p-3.5 focus-within:border-green transition-colors">
+            {/* Подсказка/статус голосового ввода */}
+            {voice.listening ? (
+              <div className="mb-3"><ListeningBar label={t.voice_listening} /></div>
+            ) : voice.error === 'denied' ? (
+              <p className="text-[12.5px] font-medium mb-3" style={{ color: 'var(--red)' }}>{t.voice_denied}</p>
+            ) : voice.error === 'unsupported' ? (
+              <p className="text-[12.5px] text-muted mb-3">{t.voice_unsupported}</p>
+            ) : voice.supported ? (
+              <p className="flex items-center gap-1.5 text-[12.5px] text-muted mb-3">
+                <Icon name="mic" size={14} className="text-green" />
+                {t.voice_hint}
+              </p>
+            ) : null}
+
+            <div
+              className="bg-surface border-[1.5px] border-line rounded-2xl p-3.5 focus-within:border-green transition-colors"
+              style={{ borderColor: voice.activeField === 'comment' && voice.listening ? 'var(--green)' : undefined }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[13px] font-semibold text-text">{t.step_comment}</span>
+                <MicButton
+                  active={voice.activeField === 'comment'}
+                  listening={voice.listening}
+                  supported={voice.supported}
+                  title={voice.activeField === 'comment' && voice.listening ? t.voice_stop : t.voice_comment}
+                  onClick={() => voice.toggle('comment', comment, setComment)}
+                />
+              </div>
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}

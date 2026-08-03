@@ -62,9 +62,26 @@ def create_user():
         store_id=store_id,
     )
     user.set_password(password)
+    _apply_supervised_stores(user, data)
     db.session.add(user)
     db.session.commit()
     return jsonify({'user': user.to_dict()}), 201
+
+
+def _apply_supervised_stores(user, data):
+    """Назначить супервайзеру точки под надзором (список supervised_store_ids).
+    Актуально только для роли reviewer; для остальных связь очищается."""
+    if 'supervised_store_ids' not in data:
+        return
+    if user.role != ROLE_REVIEWER:
+        user.supervised_stores = []
+        return
+    ids = data.get('supervised_store_ids') or []
+    try:
+        ids = [int(i) for i in ids if i]
+    except (TypeError, ValueError):
+        ids = []
+    user.supervised_stores = Store.query.filter(Store.id.in_(ids)).all() if ids else []
 
 
 @admin_bp.route('/users/<int:user_id>', methods=['PUT'])
@@ -93,6 +110,8 @@ def update_user(user_id):
         if len(data['password']) < 6:
             return jsonify({'error': 'Пароль минимум 6 символов'}), 400
         user.set_password(data['password'])
+
+    _apply_supervised_stores(user, data)
 
     db.session.commit()
     return jsonify({'user': user.to_dict()})

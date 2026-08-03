@@ -7,11 +7,16 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.content.FileProvider
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -28,8 +33,13 @@ class MainActivity : Activity() {
     private var allowMultiple = false
     private var captureOnly = false
 
+    // Голосовой ввод (нативное распознавание речи, мост в JS: window.AndroidVoice)
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var pendingVoiceLang: String? = null
+
     private val REQ_FILE_CHOOSER = 1001
     private val REQ_CAMERA_PERMISSION = 2001
+    private val REQ_AUDIO_PERMISSION = 2002
 
     @Suppress("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,6 +63,9 @@ class MainActivity : Activity() {
             cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
             userAgentString = "$userAgentString BahandiAndroid/1.0"
         }
+
+        // Мост для голосового ввода: window.AndroidVoice.{isAvailable,start,stop}
+        webView.addJavascriptInterface(VoiceBridge(), "AndroidVoice")
 
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = object : WebChromeClient() {
@@ -162,6 +175,124 @@ class MainActivity : Activity() {
             // Независимо от ответа открываем выбор (без камеры — только галерея)
             launchChooser()
         }
+        if (requestCode == REQ_AUDIO_PERMISSION) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            val lang = pendingVoiceLang
+            pendingVoiceLang = null
+            if (granted && lang != null) startVoice(lang) else emitVoiceError("denied")
+        }
+    }
+
+    // ---------------- Голосовой ввод (native speech-to-text) ----------------
+
+    /** JS-мост: доступен из веб-кода как window.AndroidVoice */
+    inner class VoiceBridge {
+        @JavascriptInterface
+        fun isAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(this@MainActivity)
+
+        @JavascriptInterface
+        fun start(lang: String) {
+            runOnUiThread { startVoice(lang) }
+        }
+
+        @JavascriptInterface
+        fun stop() {
+            runOnUiThread { stopVoice() }
+        }
+    }
+
+    private fun startVoice(lang: String) {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            pendingVoiceLang = lang
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQ_AUDIO_PERMISSION)
+            return
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            emitVoiceError("unsupported")
+            return
+        }
+        // Пересоздаём распознаватель на каждый запуск — так стабильнее
+        speechRecognizer?.destroy()
+        val recognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognizer = recognizer
+        recognizer.setRecognitionListener(voiceListener)
+
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true) // текст сразу по мере речи
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        try {
+            recognizer.startListening(intent)
+        } catch (_: Exception) {
+            emitVoiceError("unsupported")
+        }
+    }
+
+    private fun stopVoice() {
+        speechRecognizer?.let {
+            try { it.stopListening() } catch (_: Exception) {}
+            try { it.cancel() } catch (_: Exception) {}
+            try { it.destroy() } catch (_: Exception) {}
+        }
+        speechRecognizer = null
+    }
+
+    private val voiceListener = object : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) {}
+        override fun onBeginningOfSpeech() {}
+        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onEndOfSpeech() {}
+
+        override fun onPartialResults(partialResults: Bundle?) {
+            firstResult(partialResults)?.let { emitVoiceResult(it) }
+        }
+
+        override fun onResults(results: Bundle?) {
+            firstResult(results)?.let { emitVoiceResult(it) }
+            emitVoiceEnd()
+        }
+
+        override fun onError(error: Int) {
+            when (error) {
+                // Нет речи/таймаут — это не ошибка для пользователя, просто завершаем
+                SpeechRecognizer.ERROR_NO_MATCH,
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> emitVoiceEnd()
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> emitVoiceError("denied")
+                else -> emitVoiceError("error")
+            }
+        }
+
+        override fun onEvent(eventType: Int, params: Bundle?) {}
+    }
+
+    private fun firstResult(bundle: Bundle?): String? {
+        val list = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        return list?.firstOrNull()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun emitVoiceResult(text: String) {
+        val js = "window.__bahandiVoice && window.__bahandiVoice.onResult(${JSONObject.quote(text)});"
+        runOnUiThread { webView.evaluateJavascript(js, null) }
+    }
+
+    private fun emitVoiceEnd() {
+        runOnUiThread {
+            webView.evaluateJavascript("window.__bahandiVoice && window.__bahandiVoice.onEnd();", null)
+        }
+    }
+
+    private fun emitVoiceError(code: String) {
+        val js = "window.__bahandiVoice && window.__bahandiVoice.onError(${JSONObject.quote(code)});"
+        runOnUiThread { webView.evaluateJavascript(js, null) }
+    }
+
+    override fun onDestroy() {
+        stopVoice()
+        super.onDestroy()
     }
 
     override fun onBackPressed() {

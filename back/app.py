@@ -26,6 +26,7 @@ jwt = JWTManager()
 # Формат: (таблица, колонка, DDL-тип с DEFAULT для бэкфилла существующих строк).
 _SCHEMA_PATCHES = [
     ('write_offs', 'source', "VARCHAR(20) NOT NULL DEFAULT 'manual'"),
+    ('write_offs', 'deduct_all', "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 
 

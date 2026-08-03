@@ -42,6 +42,8 @@ module.exports = {
         pop: { '0%': { transform: 'scale(.85)', opacity: 0 }, '60%': { transform: 'scale(1.04)' }, '100%': { transform: 'scale(1)', opacity: 1 } },
         slideUp: { from: { transform: 'translateY(100%)' }, to: { transform: 'translateY(0)' } },
         spin: { to: { transform: 'rotate(360deg)' } },
+        micPulse: { '0%': { transform: 'scale(1)', opacity: 0.5 }, '100%': { transform: 'scale(2.1)', opacity: 0 } },
+        eq: { '0%,100%': { transform: 'scaleY(0.35)' }, '50%': { transform: 'scaleY(1)' } },
       },
       animation: {
         fadeUp: 'fadeUp .3s ease',
@@ -49,6 +51,8 @@ module.exports = {
         screenIn: 'screenIn .34s cubic-bezier(.2,.7,.2,1)',
         pop: 'pop .4s ease both',
         slideUp: 'slideUp .32s cubic-bezier(.2,.8,.2,1)',
+        micPulse: 'micPulse 1.5s ease-out infinite',
+        eq: 'eq .9s ease-in-out infinite',
       },
     },
   },
