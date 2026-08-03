@@ -35,6 +35,7 @@ struct AdminFormView: View {
     @State private var iikoStoreId = ""
     @State private var position = ""
     @State private var isActive = true
+    @State private var supervisedStoreIds: Set<Int> = []
 
     @State private var saving = false
     @State private var error: String?
@@ -60,6 +61,13 @@ struct AdminFormView: View {
                         SecureField(settings.t("f_password"), text: $password)
                         rolePicker
                         storePicker
+                        if role == Role.reviewer {
+                            Section(settings.t("supervised_stores")) {
+                                ForEach(stores) { s in
+                                    Toggle(s.name, isOn: Binding(get: { supervisedStoreIds.contains(s.id) }, set: { on in if on { supervisedStoreIds.insert(s.id) } else { supervisedStoreIds.remove(s.id) } }))
+                                }
+                            }
+                        }
                         TextField(settings.t("f_email"), text: $email).textInputAutocapitalization(.never).autocorrectionDisabled()
                         if isEdit { Toggle(settings.t("admin_active"), isOn: $isActive) }
                     }
@@ -135,7 +143,7 @@ struct AdminFormView: View {
     private func prefill() {
         switch config {
         case .editUser(let u):
-            fullName = u.fullName; role = u.role; storeId = u.storeId; email = u.email ?? ""; isActive = u.isActive ?? true
+            fullName = u.fullName; role = u.role; storeId = u.storeId; email = u.email ?? ""; isActive = u.isActive ?? true; supervisedStoreIds = Set(u.supervisedStoreIds ?? [])
         case .editStore(let s):
             fullName = s.name; address = s.address ?? ""; iikoStoreId = s.iikoStoreId ?? ""
         case .editEmployee(let e):
@@ -149,9 +157,9 @@ struct AdminFormView: View {
         do {
             switch config {
             case .newUser:
-                _ = try await APIClient.shared.adminCreateUser(["username": username, "password": password, "full_name": fullName, "role": role, "store_id": storeId, "email": email.isEmpty ? nil : email])
+                _ = try await APIClient.shared.adminCreateUser(["username": username, "password": password, "full_name": fullName, "role": role, "store_id": storeId, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email])
             case .editUser(let u):
-                var p: [String: Any?] = ["full_name": fullName, "role": role, "store_id": storeId, "email": email.isEmpty ? nil : email, "is_active": isActive]
+                var p: [String: Any?] = ["full_name": fullName, "role": role, "store_id": storeId, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email, "is_active": isActive]
                 if !password.isEmpty { p["password"] = password }
                 _ = try await APIClient.shared.adminUpdateUser(u.id, p)
             case .newStore:

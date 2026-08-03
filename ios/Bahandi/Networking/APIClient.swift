@@ -116,7 +116,7 @@ final class APIClient {
     }
 
     // MARK: - Загрузка фото (multipart)
-    func uploadPhoto(_ imageData: Data, filename: String = "photo.jpg") async throws -> UploadResponse {
+    func uploadPhoto(_ imageData: Data, filename: String = "photo.jpg", recognize: Bool = false) async throws -> UploadResponse {
         let boundary = "Boundary-\(UUID().uuidString)"
         var req = URLRequest(url: apiURL.appendingPathComponent("uploads/photo"))
         req.httpMethod = "POST"
@@ -128,6 +128,9 @@ final class APIClient {
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
         body.append(imageData)
+        body.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"recognize\"\r\n\r\n".data(using: .utf8)!)
+        body.append((recognize ? "1" : "0").data(using: .utf8)!)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         req.httpBody = body
 
@@ -136,5 +139,11 @@ final class APIClient {
             throw APIError(message: "Не удалось загрузить фото", status: 0)
         }
         return try decoder.decode(UploadResponse.self, from: data)
+    }
+
+    func recognizePhoto(_ filename: String) async throws -> Recognition? {
+        struct Response: Codable { let recognition: Recognition? }
+        let response: Response = try await post("uploads/recognize", body: ["filename": filename])
+        return response.recognition
     }
 }

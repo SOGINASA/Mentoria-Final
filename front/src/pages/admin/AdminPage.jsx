@@ -221,6 +221,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
         store_id: entity?.store_id || '',
         email: entity?.email || '',
         phone: entity?.phone || '',
+        supervised_store_ids: entity?.supervised_store_ids || [],
         is_active: entity ? entity.is_active : true,
       };
     if (tab === 'stores')
@@ -253,6 +254,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
           store_id: storeId,
           email: form.email || undefined,
           phone: form.phone || undefined,
+          supervised_store_ids: form.role === ROLE_REVIEWER ? form.supervised_store_ids : [],
           is_active: form.is_active,
         };
         if (form.password) payload.password = form.password;
@@ -328,6 +330,17 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
             />
             <RoleChips value={form.role} onChange={(r) => setForm((f) => ({ ...f, role: r }))} t={t} />
             {storeOptions}
+            {form.role === ROLE_REVIEWER && (
+              <div className="flex flex-col gap-2">
+                <span className="text-[12px] font-semibold text-muted">Точки супервайзера</span>
+                <div className="flex flex-wrap gap-2">
+                  {stores.map((s) => {
+                    const selected = form.supervised_store_ids.includes(s.id);
+                    return <button key={s.id} type="button" onClick={() => setForm((f) => ({ ...f, supervised_store_ids: selected ? f.supervised_store_ids.filter((id) => id !== s.id) : [...f.supervised_store_ids, s.id] }))} className="px-3 py-2 rounded-xl text-[12px] font-semibold border" style={{ background: selected ? 'var(--green-tint)' : 'var(--surface)', borderColor: selected ? 'var(--green)' : 'var(--line)', color: selected ? 'var(--green)' : 'var(--text)' }}>{s.name}</button>;
+                  })}
+                </div>
+              </div>
+            )}
             <Field label={t.f_email} value={form.email} onChange={set('email')} />
             <Field label={t.f_phone} value={form.phone} onChange={set('phone')} />
             {isEdit && <ActiveToggle label={t.admin_active} checked={form.is_active} onChange={(v) => setForm((f) => ({ ...f, is_active: v }))} />}

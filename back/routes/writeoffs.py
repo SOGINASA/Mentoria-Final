@@ -95,7 +95,13 @@ def create_write_off():
     data = request.get_json(silent=True) or {}
 
     # --- store ---
+    # Отправитель закреплён за одной точкой. Не доверяем store_id с клиента:
+    # иначе можно создать заявку от имени чужой точки простым POST-запросом.
     store_id = data.get('store_id')
+    if user.store_id:
+        if store_id and str(store_id) != str(user.store_id):
+            return jsonify({'error': 'Отправитель может оформлять списания только по своей точке'}), 403
+        store_id = user.store_id
     store = Store.query.filter_by(id=store_id, is_active=True).first() if store_id else None
     if not store:
         return jsonify({'error': 'Выберите существующую торговую точку'}), 400
@@ -147,8 +153,12 @@ def create_write_off():
                 # старого/чужого хоста.
                 db.session.add(WriteOffPhoto(write_off_id=wo.id, url=normalize_photo_url(url)))
 
-        # Позиции списания — опционально
-        for item in (data.get('items') or []):
+        # Позиции списания. product_name — короткая форма для мобильных
+        # клиентов; items сохраняет API совместимым с интеграцией iiko.
+        items = data.get('items') or []
+        if not items and (data.get('product_name') or '').strip():
+            items = [{'product_name': data['product_name']}]
+        for item in items:
             name = (item.get('product_name') or '').strip()
             if not name:
                 continue
@@ -410,6 +420,8 @@ def approve_write_off(wo_id):
     wo = WriteOff.query.get(wo_id)
     if not wo:
         return jsonify({'error': 'Заявка не найдена'}), 404
+    if not _can_view(user, wo):
+        return jsonify({'error': 'Нет доступа к заявке этой точки'}), 403
     if wo.status != STATUS_PENDING:
         return jsonify({'error': 'Заявка уже обработана'}), 409
 
@@ -445,6 +457,8 @@ def reject_write_off(wo_id):
     wo = WriteOff.query.get(wo_id)
     if not wo:
         return jsonify({'error': 'Заявка не найдена'}), 404
+    if not _can_view(user, wo):
+        return jsonify({'error': 'Нет доступа к заявке этой точки'}), 403
     if wo.status != STATUS_PENDING:
         return jsonify({'error': 'Заявка уже обработана'}), 409
 
@@ -468,9 +482,12 @@ def reject_write_off(wo_id):
 @writeoffs_bp.route('/<int:wo_id>/retry-iiko', methods=['POST'])
 @role_required(ROLE_REVIEWER)
 def retry_iiko(wo_id):
+    user = get_current_user()
     wo = WriteOff.query.get(wo_id)
     if not wo:
         return jsonify({'error': 'Заявка не найдена'}), 404
+    if not _can_view(user, wo):
+        return jsonify({'error': 'Нет доступа к заявке этой точки'}), 403
     if wo.status != STATUS_APPROVED:
         return jsonify({'error': 'Синхронизация возможна только для подтверждённых заявок'}), 409
 

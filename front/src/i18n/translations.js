@@ -177,6 +177,8 @@ export const translations = {
     f_product: 'Название товара',
     f_product_opt: 'Название товара',
     f_product_ph: 'Например: Котлета, Булочка, Помидоры…',
+    deduct_all: 'Удержать со всех на точке',
+    deduct_all_short: 'Все сотрудники точки',
     // --- голосовой ввод ---
     voice_name: 'Продиктовать название',
     voice_comment: 'Продиктовать описание',
@@ -388,6 +390,8 @@ export const translations = {
     f_product: 'Тауар атауы',
     f_product_opt: 'Тауар атауы',
     f_product_ph: 'Мысалы: Котлета, Бөлке, Қызанақ…',
+    deduct_all: 'Нүктедегі барлығынан ұстау',
+    deduct_all_short: 'Нүктенің барлық қызметкері',
     // --- дауыспен енгізу ---
     voice_name: 'Атауын дауыстап айту',
     voice_comment: 'Сипаттаманы дауыстап айту',
