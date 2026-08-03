@@ -50,6 +50,12 @@ def create_app(config_object=None):
 
     CORS(app, supports_credentials=True, origins=app.config['CORS_ORIGINS'])
 
+    # Печатаем адрес, из которого собираются ссылки на фото: если он не совпадает
+    # с публичным адресом API (включая префикс за nginx, напр. https://host/bahandi),
+    # картинки в интерфейсе будут битыми — причём молча, без ошибок в консоли
+    # браузера (фронтовый nginx вернёт на такой путь 200 и index.html).
+    print(f"[config] API_BASE_URL={app.config['API_BASE_URL']} (база для ссылок на фото)")
+
     # Папки для БД и загрузок
     os.makedirs(DATABASE_DIR, exist_ok=True)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -104,8 +110,15 @@ def _register_misc_routes(app):
     def health():
         return jsonify({'status': 'ok'})
 
-    # Отдача загруженных фото
+    # Отдача загруженных фото.
+    # Путей несколько намеренно: ссылка на фото собирается из API_BASE_URL, а его
+    # на разных стендах задают то как адрес хоста (…/bahandi), то как адрес API
+    # (…/bahandi/api). Во втором случае ссылка получается вида /api/uploads/<файл>,
+    # и без этого роута фото просто не открывались.
+    # У алиаса конвертер без слэшей (<filename>, а не <path:filename>), чтобы он
+    # не перехватывал уже существующий /api/uploads/files/<файл>.
     @app.route('/uploads/<path:filename>')
+    @app.route('/api/uploads/<filename>')
     @app.route('/api/uploads/files/<path:filename>')
     def serve_upload(filename):
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)

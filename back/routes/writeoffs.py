@@ -11,7 +11,7 @@ from models import db, WriteOff, WriteOffPhoto, WriteOffItem, WriteOffDeduction,
 from utils.auth_helpers import get_current_user, role_required
 from utils.validators import parse_date
 from utils.request_helpers import get_pagination
-from utils.uploads import save_image_file
+from utils.uploads import save_image_file, normalize_photo_url
 from services import iiko_service
 from services.notifications import notify, notify_reviewers, notify_admins
 from constants import (
@@ -142,7 +142,10 @@ def create_write_off():
 
         for url in photo_urls:
             if url:
-                db.session.add(WriteOffPhoto(write_off_id=wo.id, url=url))
+                # Клиент присылает ссылку, которую сам получил из /uploads/photo.
+                # Приводим к текущему API_BASE_URL, чтобы в базу не попал адрес
+                # старого/чужого хоста.
+                db.session.add(WriteOffPhoto(write_off_id=wo.id, url=normalize_photo_url(url)))
 
         # Позиции списания — опционально
         for item in (data.get('items') or []):

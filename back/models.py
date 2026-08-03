@@ -240,7 +240,10 @@ class WriteOffPhoto(db.Model):
     created_at = db.Column(db.DateTime, default=_now)
 
     def to_dict(self):
-        return {'id': self.id, 'url': self.url}
+        # URL пересобираем от текущего API_BASE_URL: в базе он абсолютный и мог
+        # быть записан со старым адресом бэка (см. normalize_photo_url).
+        from utils.uploads import normalize_photo_url
+        return {'id': self.id, 'url': normalize_photo_url(self.url)}
 
 
 class WriteOffItem(db.Model):
@@ -360,6 +363,7 @@ class Notification(db.Model):
     write_off = db.relationship('WriteOff', foreign_keys=[write_off_id])
 
     def to_dict(self):
+        from utils.uploads import normalize_photo_url
         wo = self.write_off
         return {
             'id': self.id,
@@ -374,6 +378,6 @@ class Notification(db.Model):
                 'id': wo.id,
                 'status': wo.status,
                 'source': wo.source,
-                'photo_url': wo.photos[0].url if wo.photos else None,
+                'photo_url': normalize_photo_url(wo.photos[0].url) if wo.photos else None,
             } if wo else None,
         }
