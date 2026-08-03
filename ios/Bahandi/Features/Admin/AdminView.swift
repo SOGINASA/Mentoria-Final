@@ -34,10 +34,10 @@ struct AdminView: View {
                 Button { form = createConfig() } label: { Image(systemName: "plus") }
             }
         }
-        .task { await loadStores() }
+        .task { await loadReferences() }
         .task(id: tab) { await reload() }
         .sheet(item: $form) { cfg in
-            AdminFormView(config: cfg, stores: stores) { Task { await reload() } }
+            AdminFormView(config: cfg, stores: stores, employees: employees) { Task { await reload() } }
         }
     }
 
@@ -79,7 +79,10 @@ struct AdminView: View {
         default: employees = (try? await APIClient.shared.employees().employees) ?? []
         }
     }
-    private func loadStores() async { stores = (try? await APIClient.shared.stores().stores) ?? [] }
+    private func loadReferences() async {
+        stores = (try? await APIClient.shared.stores().stores) ?? []
+        employees = (try? await APIClient.shared.employees().employees) ?? []
+    }
 
     private func roleLabel(_ r: String) -> String {
         r == Role.reviewer ? settings.t("role_reviewer") : r == Role.admin ? settings.t("role_admin") : settings.t("role_sender")

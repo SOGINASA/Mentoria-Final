@@ -22,6 +22,7 @@ struct AdminFormView: View {
     @Environment(\.dismiss) private var dismiss
     let config: AdminFormConfig
     let stores: [Store]
+    let employees: [Employee]
     let onSaved: () -> Void
 
     // общие поля
@@ -30,6 +31,7 @@ struct AdminFormView: View {
     @State private var password = ""
     @State private var role = Role.sender
     @State private var storeId: Int?
+    @State private var employeeId: Int?
     @State private var email = ""
     @State private var address = ""
     @State private var iikoStoreId = ""
@@ -61,6 +63,7 @@ struct AdminFormView: View {
                         SecureField(settings.t("f_password"), text: $password)
                         rolePicker
                         storePicker
+                        if role == Role.sender { employeePicker }
                         if role == Role.reviewer {
                             Section(settings.t("supervised_stores")) {
                                 ForEach(stores) { s in
@@ -132,6 +135,15 @@ struct AdminFormView: View {
         }
     }
 
+    private var employeePicker: some View {
+        Picker(settings.t("f_self_employee"), selection: $employeeId) {
+            Text(settings.t("no_employee_link")).tag(Optional<Int>.none)
+            ForEach(employees.filter { storeId == nil || $0.storeId == storeId }) { employee in
+                Text(employee.fullName).tag(Optional(employee.id))
+            }
+        }
+    }
+
     private var title: String {
         switch kind {
         case .user: return isEdit ? settings.t("admin_users") : settings.t("admin_add")
@@ -143,7 +155,7 @@ struct AdminFormView: View {
     private func prefill() {
         switch config {
         case .editUser(let u):
-            fullName = u.fullName; role = u.role; storeId = u.storeId; email = u.email ?? ""; isActive = u.isActive ?? true; supervisedStoreIds = Set(u.supervisedStoreIds ?? [])
+            fullName = u.fullName; role = u.role; storeId = u.storeId; employeeId = u.employeeId; email = u.email ?? ""; isActive = u.isActive ?? true; supervisedStoreIds = Set(u.supervisedStoreIds ?? [])
         case .editStore(let s):
             fullName = s.name; address = s.address ?? ""; iikoStoreId = s.iikoStoreId ?? ""
         case .editEmployee(let e):
@@ -157,9 +169,9 @@ struct AdminFormView: View {
         do {
             switch config {
             case .newUser:
-                _ = try await APIClient.shared.adminCreateUser(["username": username, "password": password, "full_name": fullName, "role": role, "store_id": storeId, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email])
+                _ = try await APIClient.shared.adminCreateUser(["username": username, "password": password, "full_name": fullName, "role": role, "store_id": storeId, "employee_id": role == Role.sender ? employeeId : nil, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email])
             case .editUser(let u):
-                var p: [String: Any?] = ["full_name": fullName, "role": role, "store_id": storeId, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email, "is_active": isActive]
+                var p: [String: Any?] = ["full_name": fullName, "role": role, "store_id": storeId, "employee_id": role == Role.sender ? employeeId : nil, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email, "is_active": isActive]
                 if !password.isEmpty { p["password"] = password }
                 _ = try await APIClient.shared.adminUpdateUser(u.id, p)
             case .newStore:

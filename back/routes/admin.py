@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify
 from models import db, User, Store, Employee
 from utils.auth_helpers import role_required
 from utils.validators import validate_username, validate_email
-from constants import ROLE_ADMIN, ROLES
+from constants import ROLE_ADMIN, ROLE_REVIEWER, ROLE_SENDER, ROLES
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -52,6 +52,14 @@ def create_user():
     store_id = data.get('store_id')
     if store_id and not Store.query.get(store_id):
         return jsonify({'error': 'Точка не найдена'}), 400
+    employee_id = data.get('employee_id')
+    if role != ROLE_SENDER:
+        employee_id = None
+    employee = Employee.query.get(employee_id) if employee_id else None
+    if employee_id and not employee:
+        return jsonify({'error': 'Сотрудник не найден'}), 400
+    if employee and store_id and employee.store_id != store_id:
+        return jsonify({'error': 'Сотрудник должен относиться к точке отправителя'}), 400
 
     user = User(
         username=username,
@@ -60,6 +68,7 @@ def create_user():
         full_name=full_name,
         role=role,
         store_id=store_id,
+        employee_id=employee_id,
     )
     user.set_password(password)
     _apply_supervised_stores(user, data)
@@ -104,6 +113,15 @@ def update_user(user_id):
         if data['store_id'] and not Store.query.get(data['store_id']):
             return jsonify({'error': 'Точка не найдена'}), 400
         user.store_id = data['store_id']
+    if 'employee_id' in data:
+        employee = Employee.query.get(data['employee_id']) if data['employee_id'] else None
+        if data['employee_id'] and not employee:
+            return jsonify({'error': 'Сотрудник не найден'}), 400
+        if employee and user.store_id and employee.store_id != user.store_id:
+            return jsonify({'error': 'Сотрудник должен относиться к точке отправителя'}), 400
+        user.employee_id = data['employee_id']
+    if user.role != ROLE_SENDER:
+        user.employee_id = None
     if 'is_active' in data:
         user.is_active = bool(data['is_active'])
     if data.get('password'):

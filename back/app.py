@@ -27,6 +27,7 @@ jwt = JWTManager()
 _SCHEMA_PATCHES = [
     ('write_offs', 'source', "VARCHAR(20) NOT NULL DEFAULT 'manual'"),
     ('write_offs', 'deduct_all', "BOOLEAN NOT NULL DEFAULT 0"),
+    ('users', 'employee_id', "INTEGER"),
 ]
 
 
@@ -42,6 +43,38 @@ def _ensure_schema():
         db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {ddl}'))
         db.session.commit()
         print(f'[schema] добавлена недостающая колонка {table}.{column}')
+
+
+def _ensure_sender_employee_links():
+    """Связывает старые аккаунты отправителей с карточкой сотрудника.
+
+    Раньше такой связи в схеме не было. Для существующих аккаунтов сначала
+    ищем сотрудника точки по ФИО, а если его нет — создаём карточку с тем же
+    именем. Благодаря этому «Списать с меня» работает сразу после обновления.
+    """
+    from constants import ROLE_SENDER
+    from models import User, Employee
+
+    changed = False
+    users = User.query.filter_by(role=ROLE_SENDER, is_active=True).all()
+    for user in users:
+        if user.employee_id or not user.store_id:
+            continue
+        employee = Employee.query.filter(
+            Employee.store_id == user.store_id,
+            db.func.lower(Employee.full_name) == user.full_name.strip().lower(),
+        ).first()
+        if not employee:
+            employee = Employee(
+                full_name=user.full_name.strip(), position='Отправитель',
+                store_id=user.store_id, is_active=True,
+            )
+            db.session.add(employee)
+            db.session.flush()
+        user.employee_id = employee.id
+        changed = True
+    if changed:
+        db.session.commit()
 
 
 def create_app(config_object=None):
@@ -67,6 +100,7 @@ def create_app(config_object=None):
     with app.app_context():
         db.create_all()
         _ensure_schema()
+        _ensure_sender_employee_links()
 
     # Blueprints
     from routes import (

@@ -28,6 +28,7 @@ export default function CreateWriteOffPage() {
   const [wtype, setWtype] = useState('');
   const [employeeIds, setEmployeeIds] = useState([]);
   const [deductAll, setDeductAll] = useState(false);
+  const [choosingOtherEmployees, setChoosingOtherEmployees] = useState(false);
   const [comment, setComment] = useState('');
   const [productName, setProductName] = useState(''); // только фронт (бэк пока не подвязан)
   const [empQuery, setEmpQuery] = useState('');
@@ -47,8 +48,17 @@ export default function CreateWriteOffPage() {
 
   // подгрузить сотрудников выбранной точки для шага удержания
   useEffect(() => {
-    if (wtype === TYPE_WITH_DEDUCTION && storeId) loadEmployees(storeId);
-  }, [wtype, storeId, loadEmployees]);
+    let cancelled = false;
+    if (wtype === TYPE_WITH_DEDUCTION && storeId) {
+      loadEmployees(storeId).then((list) => {
+        if (cancelled) return;
+        const own = list.find((e) => e.id === user?.employee_id) || list.find((e) => e.full_name.trim().localeCompare(user?.full_name?.trim() || '', undefined, { sensitivity: 'base' }) === 0);
+        if (own) setEmployeeIds((ids) => ids.length ? ids : [own.id]);
+        else setChoosingOtherEmployees(true);
+      });
+    }
+    return () => { cancelled = true; };
+  }, [wtype, storeId, loadEmployees, user?.employee_id, user?.full_name]);
 
   const steps = useMemo(() => {
     // Точка закреплена за отправителем — выбирать её в мастере нельзя.
@@ -68,6 +78,7 @@ export default function CreateWriteOffPage() {
   const commentLen = comment.trim().length;
   const store = stores.find((s) => s.id === storeId);
   const selectedEmployees = employees.filter((e) => employeeIds.includes(e.id));
+  const currentEmployee = employees.find((e) => e.id === user?.employee_id) || employees.find((e) => e.full_name.trim().localeCompare(user?.full_name?.trim() || '', undefined, { sensitivity: 'base' }) === 0);
 
   const valid = (() => {
     if (cur === 'photo') return photos.length > 0;
@@ -131,7 +142,6 @@ export default function CreateWriteOffPage() {
         type: wtype,
         deduction_employee_ids: wtype === TYPE_WITH_DEDUCTION ? employeeIds : undefined,
         deduct_all: wtype === TYPE_WITH_DEDUCTION ? deductAll : undefined,
-        items: productName.trim() ? [{ product_name: productName.trim() }] : undefined,
         comment: comment.trim(),
         photo_urls: photos.map((p) => p.url),
         items: productName.trim() ? [{ product_name: productName.trim(), quantity: 1 }] : [],
@@ -263,7 +273,7 @@ export default function CreateWriteOffPage() {
               sub={t.type_nohold_sub}
               onClick={() => {
                 setWtype(TYPE_NO_DEDUCTION);
-                setEmployeeIds([]); setDeductAll(false);
+                setEmployeeIds([]); setDeductAll(false); setChoosingOtherEmployees(false);
               }}
             />
             <TypeCard
@@ -283,15 +293,24 @@ export default function CreateWriteOffPage() {
         {/* ШАГ: сотрудник */}
         {cur === 'employee' && (
           <div className="flex flex-col gap-2.5">
-            <div className="flex items-center gap-2.5 bg-surface border-[1.5px] border-line rounded-xl px-3.5 h-12 mb-1">
-              <Icon name="search" size={17} className="text-faint" />
-              <input
-                value={empQuery}
-                onChange={(e) => setEmpQuery(e.target.value)}
-                placeholder={t.search_emp}
-                className="flex-1 border-none outline-none bg-transparent text-sm text-text"
-              />
-            </div>
+            {currentEmployee ? (
+              <button type="button" onClick={() => { setEmployeeIds([currentEmployee.id]); setDeductAll(false); setChoosingOtherEmployees(false); }}
+                className="flex items-center gap-3.5 p-3 rounded-2xl cursor-pointer text-left bg-surface border-[1.5px] transition"
+                style={{ borderColor: !deductAll && employeeIds.length === 1 && employeeIds[0] === currentEmployee.id ? 'var(--green)' : 'var(--line)' }}>
+                <div className="w-10 h-10 flex-none rounded-full bg-green-tint text-green grid place-items-center font-head font-semibold text-sm">{initials(currentEmployee.full_name)}</div>
+                <div className="flex-1"><div className="font-semibold text-[14.5px] text-text">{t.deduct_self}</div><div className="text-xs text-muted">{currentEmployee.full_name}</div></div>
+                {!deductAll && employeeIds.length === 1 && employeeIds[0] === currentEmployee.id && <CheckDot />}
+              </button>
+            ) : (
+              <div className="rounded-xl px-3.5 py-3 text-[12.5px] text-muted bg-orange-tint">{t.deduct_self_missing}</div>
+            )}
+            <button type="button" onClick={() => { setChoosingOtherEmployees((v) => !v); setDeductAll(false); }}
+              className="flex items-center gap-3.5 p-3 rounded-2xl cursor-pointer text-left bg-surface border-[1.5px] border-line">
+              <div className="w-10 h-10 flex-none rounded-full bg-surface2 text-green grid place-items-center"><Icon name="users" size={19} /></div>
+              <div className="flex-1"><div className="font-semibold text-[14.5px] text-text">{t.deduct_other}</div><div className="text-xs text-muted">{t.deduct_other_sub}</div></div>
+              <Icon name={choosingOtherEmployees ? 'chevronLeft' : 'chevronRight'} size={17} className="text-faint" />
+            </button>
+            {choosingOtherEmployees && <>
             <button
               type="button"
               onClick={() => { setDeductAll((v) => !v); setEmployeeIds([]); }}
@@ -302,6 +321,11 @@ export default function CreateWriteOffPage() {
               <div className="flex-1 font-semibold text-[14.5px] text-text">{t.deduct_all}</div>
               {deductAll && <CheckDot />}
             </button>
+            {!deductAll && <div className="flex items-center gap-2.5 bg-surface border-[1.5px] border-line rounded-xl px-3.5 h-12 mb-1">
+              <Icon name="search" size={17} className="text-faint" />
+              <input value={empQuery} onChange={(e) => setEmpQuery(e.target.value)} placeholder={t.search_emp}
+                className="flex-1 border-none outline-none bg-transparent text-sm text-text" />
+            </div>}
             {!deductAll && filteredEmps.map((e) => {
               const checked = employeeIds.includes(e.id);
               return (
@@ -322,6 +346,7 @@ export default function CreateWriteOffPage() {
                 </button>
               );
             })}
+            </>}
           </div>
         )}
 

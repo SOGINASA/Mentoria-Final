@@ -35,6 +35,10 @@ export default function AdminPage() {
     const d = await listStores();
     setStores(d.stores || []);
   }, []);
+  const loadEmployees = useCallback(async () => {
+    const d = await listEmployees();
+    setEmployees(d.employees || []);
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -56,7 +60,8 @@ export default function AdminPage() {
   // справочник точек нужен в формах пользователей/сотрудников
   useEffect(() => {
     loadStores();
-  }, [loadStores]);
+    loadEmployees();
+  }, [loadStores, loadEmployees]);
 
   async function onDeactivate(kind, id) {
     if (!window.confirm(t.admin_deactivate_q)) return;
@@ -160,6 +165,7 @@ export default function AdminPage() {
           mode={sheet.mode}
           entity={sheet.entity}
           stores={stores}
+          employees={employees}
           onClose={() => setSheet(null)}
           onSaved={() => {
             setSheet(null);
@@ -204,7 +210,7 @@ function Row({ active, avatar, icon, title, sub, badge, onEdit, onDeactivate }) 
 }
 
 // ---------- Форма создания/редактирования ----------
-function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
+function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
   const { t } = useI18n();
   const showToast = useUiStore((s) => s.showToast);
   const isEdit = mode === 'edit';
@@ -219,6 +225,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
         password: '',
         role: entity?.role || ROLE_SENDER,
         store_id: entity?.store_id || '',
+        employee_id: entity?.employee_id || '',
         email: entity?.email || '',
         phone: entity?.phone || '',
         supervised_store_ids: entity?.supervised_store_ids || [],
@@ -252,6 +259,7 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
           full_name: form.full_name,
           role: form.role,
           store_id: storeId,
+          employee_id: form.role === ROLE_SENDER && form.employee_id !== '' ? Number(form.employee_id) : null,
           email: form.email || undefined,
           phone: form.phone || undefined,
           supervised_store_ids: form.role === ROLE_REVIEWER ? form.supervised_store_ids : [],
@@ -330,6 +338,14 @@ function AdminForm({ tab, mode, entity, stores, onClose, onSaved }) {
             />
             <RoleChips value={form.role} onChange={(r) => setForm((f) => ({ ...f, role: r }))} t={t} />
             {storeOptions}
+            {form.role === ROLE_SENDER && (
+              <Select label={t.f_self_employee} value={form.employee_id} onChange={set('employee_id')}>
+                <option value="">{t.no_employee_link}</option>
+                {employees.filter((e) => !form.store_id || e.store_id === Number(form.store_id)).map((e) => (
+                  <option key={e.id} value={e.id}>{e.full_name}</option>
+                ))}
+              </Select>
+            )}
             {form.role === ROLE_REVIEWER && (
               <div className="flex flex-col gap-2">
                 <span className="text-[12px] font-semibold text-muted">Точки супервайзера</span>

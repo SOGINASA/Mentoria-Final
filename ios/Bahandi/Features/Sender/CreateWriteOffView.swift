@@ -18,6 +18,7 @@ struct CreateWriteOffView: View {
     @State private var wtype = ""
     @State private var employeeIds: Set<Int> = []
     @State private var deductAll = false
+    @State private var choosingOtherEmployees = false
     @State private var comment = ""
     @State private var productName = "" // только фронт (бэк подвяжем позже)
     @State private var empQuery = ""
@@ -41,6 +42,15 @@ struct CreateWriteOffView: View {
     private var cur: String { steps[min(stepIndex, steps.count - 1)] }
     private var isLast: Bool { stepIndex >= steps.count - 1 }
     private var commentLen: Int { comment.trimmingCharacters(in: .whitespacesAndNewlines).count }
+    private var currentEmployee: Employee? {
+        if let employeeId = auth.user?.employeeId,
+           let linked = store.employees.first(where: { $0.id == employeeId }) { return linked }
+        guard let name = auth.user?.fullName.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else { return nil }
+        return store.employees.first {
+            $0.fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+                .localizedCaseInsensitiveCompare(name) == .orderedSame
+        }
+    }
 
     private var valid: Bool {
         switch cur {
@@ -101,7 +111,13 @@ struct CreateWriteOffView: View {
             if storeId == nil { storeId = auth.user?.storeId }
         }
         .task(id: wtype) {
-            if wtype == WType.withDeduction { await store.loadEmployees(storeId: storeId) }
+            if wtype == WType.withDeduction {
+                await store.loadEmployees(storeId: storeId)
+                if employeeIds.isEmpty, !deductAll {
+                    if let currentEmployee { employeeIds = [currentEmployee.id] }
+                    else { choosingOtherEmployees = true }
+                }
+            }
         }
         .onChange(of: cur) { _, step in if step != "comment" { speech.stop() } }
         .onDisappear { speech.stop() }
@@ -190,44 +206,98 @@ struct CreateWriteOffView: View {
 
     private var employeeStep: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 13) {
-                Image(systemName: "person.3.fill").foregroundColor(AppColor.green)
-                Text(settings.t("deduct_all")).font(.system(size: 14.5, weight: .semibold)).foregroundColor(AppColor.text)
-                Spacer()
-                if deductAll { checkDot }
+            if let me = currentEmployee {
+                employeeChoiceButton(employee: me, title: settings.t("deduct_self"), subtitle: me.fullName,
+                                     selected: !deductAll && employeeIds == [me.id]) {
+                    employeeIds = [me.id]
+                    deductAll = false
+                    choosingOtherEmployees = false
+                }
+            } else {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(AppColor.orange)
+                    Text(settings.t("deduct_self_missing")).font(.system(size: 13)).foregroundColor(AppColor.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading).padding(13)
+                .background(AppColor.orangeTint).clipShape(RoundedRectangle(cornerRadius: 14))
             }
-            .padding(13).background(AppColor.surface)
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(deductAll ? AppColor.green : AppColor.line, lineWidth: 1.5))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .onTapGesture { deductAll.toggle(); employeeIds.removeAll() }
 
-            if !deductAll {
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass").foregroundColor(AppColor.faint)
-                TextField(settings.t("search_emp"), text: $empQuery)
-            }
-            .font(.system(size: 14)).padding(.horizontal, 14).frame(height: 48)
-            .background(AppColor.surface).overlay(RoundedRectangle(cornerRadius: 13).stroke(AppColor.line, lineWidth: 1.5))
-            .clipShape(RoundedRectangle(cornerRadius: 13))
-
-            ForEach(store.employees.filter { empQuery.isEmpty || $0.fullName.localizedCaseInsensitiveContains(empQuery) }) { e in
-                HStack(spacing: 13) {
-                    AvatarCircle(name: e.fullName, size: 40)
+            Button {
+                choosingOtherEmployees.toggle()
+                if choosingOtherEmployees { deductAll = false }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.2.badge.gearshape").foregroundColor(AppColor.green)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(e.fullName).font(.system(size: 14.5, weight: .semibold)).foregroundColor(AppColor.text)
-                        if let p = e.position { Text(p).font(.system(size: 12)).foregroundColor(AppColor.muted) }
+                        Text(settings.t("deduct_other")).font(.system(size: 14.5, weight: .semibold)).foregroundColor(AppColor.text)
+                        Text(settings.t("deduct_other_sub")).font(.system(size: 12)).foregroundColor(AppColor.muted)
                     }
                     Spacer()
-                    if employeeIds.contains(e.id) { checkDot }
+                    Image(systemName: choosingOtherEmployees ? "chevron.up" : "chevron.down").foregroundColor(AppColor.faint)
                 }
-                .padding(13)
-                .background(AppColor.surface)
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(employeeIds.contains(e.id) ? AppColor.green : AppColor.line, lineWidth: 1.5))
+                .padding(13).background(AppColor.surface)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppColor.line, lineWidth: 1.5))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .onTapGesture { if employeeIds.contains(e.id) { employeeIds.remove(e.id) } else { employeeIds.insert(e.id) } }
             }
+            .buttonStyle(.plain)
+
+            if choosingOtherEmployees {
+                Button {
+                    deductAll.toggle()
+                    employeeIds.removeAll()
+                } label: {
+                    HStack(spacing: 13) {
+                        Image(systemName: "person.3.fill").foregroundColor(AppColor.green)
+                        Text(settings.t("deduct_all")).font(.system(size: 14.5, weight: .semibold)).foregroundColor(AppColor.text)
+                        Spacer()
+                        if deductAll { checkDot }
+                    }
+                    .padding(13).background(AppColor.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(deductAll ? AppColor.green : AppColor.line, lineWidth: 1.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+
+                if !deductAll {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass").foregroundColor(AppColor.faint)
+                        TextField(settings.t("search_emp"), text: $empQuery)
+                    }
+                    .font(.system(size: 14)).padding(.horizontal, 14).frame(height: 48)
+                    .background(AppColor.surface).overlay(RoundedRectangle(cornerRadius: 13).stroke(AppColor.line, lineWidth: 1.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 13))
+
+                    ForEach(store.employees.filter { empQuery.isEmpty || $0.fullName.localizedCaseInsensitiveContains(empQuery) }) { employee in
+                        employeeChoiceButton(employee: employee, title: employee.fullName, subtitle: employee.position,
+                                             selected: employeeIds.contains(employee.id)) {
+                            if employeeIds.contains(employee.id) { employeeIds.remove(employee.id) }
+                            else { employeeIds.insert(employee.id) }
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private func employeeChoiceButton(employee: Employee, title: String, subtitle: String?,
+                                      selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                AvatarCircle(name: employee.fullName, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.system(size: 14.5, weight: .semibold)).foregroundColor(AppColor.text)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle).font(.system(size: 12)).foregroundColor(AppColor.muted)
+                    }
+                }
+                Spacer()
+                if selected { checkDot }
+            }
+            .padding(13).background(AppColor.surface)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(selected ? AppColor.green : AppColor.line, lineWidth: 1.5))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
     }
 
     private var commentStep: some View {
@@ -342,7 +412,12 @@ struct CreateWriteOffView: View {
         .padding(18).background(active ? tint : AppColor.surface)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(active ? fg : AppColor.line, lineWidth: 2))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .onTapGesture { wtype = type; if type == WType.noDeduction { employeeIds.removeAll(); deductAll = false } }
+        .onTapGesture {
+            wtype = type
+            if type == WType.noDeduction {
+                employeeIds.removeAll(); deductAll = false; choosingOtherEmployees = false
+            }
+        }
     }
 
     private var checkDot: some View {
@@ -448,18 +523,18 @@ struct CreateWriteOffView: View {
 
     private func submit() async {
         error = nil
+        let cleanProductName = productName.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             _ = try await store.create([
                 "store_id": storeId,
                 "type": wtype,
                 "deduction_employee_ids": wtype == WType.withDeduction ? Array(employeeIds) : nil,
                 "deduct_all": wtype == WType.withDeduction ? deductAll : nil,
-                "items": productName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : [["product_name": productName.trimmingCharacters(in: .whitespacesAndNewlines)]],
                 "comment": comment.trimmingCharacters(in: .whitespacesAndNewlines),
                 "photo_urls": photos.map(\.url),
-                "items": productName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                "items": cleanProductName.isEmpty
                     ? []
-                    : [["product_name": productName.trimmingCharacters(in: .whitespacesAndNewlines), "quantity": 1]],
+                    : [["product_name": cleanProductName, "quantity": 1]],
             ])
             settings.showToast(settings.t("sent_toast"))
             reset()
@@ -471,7 +546,7 @@ struct CreateWriteOffView: View {
 
     private func reset() {
         speech.stop()
-        stepIndex = 0; photos = []; storeId = auth.user?.storeId; wtype = ""; employeeIds = []; deductAll = false; comment = ""; productName = ""; empQuery = ""
+        stepIndex = 0; photos = []; storeId = auth.user?.storeId; wtype = ""; employeeIds = []; deductAll = false; choosingOtherEmployees = false; comment = ""; productName = ""; empQuery = ""
     }
 
     private func compressedPhoto(_ data: Data) -> Data {

@@ -50,12 +50,16 @@ class User(db.Model):
 
     # Закреплённая за отправителем точка (предзаполняется в форме создания)
     store_id = db.Column(db.Integer, db.ForeignKey('stores.id'), nullable=True, index=True)
+    # Запись этого пользователя в справочнике сотрудников. Нужна для режима
+    # «с удержанием»: по умолчанию сумма удерживается с самого отправителя.
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=True, index=True)
 
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=_now)
     last_login = db.Column(db.DateTime)
 
     store = db.relationship('Store', foreign_keys=[store_id])
+    employee = db.relationship('Employee', foreign_keys=[employee_id])
     # Точки под надзором супервайзера (только для роли reviewer). Пусто = все точки.
     supervised_stores = db.relationship('Store', secondary=supervisor_stores, lazy='selectin')
     write_offs = db.relationship(
@@ -81,6 +85,8 @@ class User(db.Model):
             'role': self.role,
             'store_id': self.store_id,
             'store': self.store.to_dict() if self.store else None,
+            'employee_id': self.employee_id,
+            'employee': self.employee.to_dict() if self.employee else None,
             'supervised_store_ids': [s.id for s in self.supervised_stores],
             'supervised_stores': [s.to_dict() for s in self.supervised_stores],
             'is_active': self.is_active,

@@ -112,8 +112,15 @@ def seed_users(stores):
 
     store1 = stores[0] if len(stores) > 0 else None
     store2 = stores[1] if len(stores) > 1 else None
-    _get_or_create_user('sender1', 'sender123', 'Отправитель Первый', ROLE_SENDER, store=store1)
-    _get_or_create_user('sender2', 'sender123', 'Отправитель Второй', ROLE_SENDER, store=store2)
+    sender1 = _get_or_create_user('sender1', 'sender123', 'Отправитель Первый', ROLE_SENDER, store=store1)
+    sender2 = _get_or_create_user('sender2', 'sender123', 'Отправитель Второй', ROLE_SENDER, store=store2)
+    # Демо-аккаунты явно связаны с сотрудниками: это обеспечивает режим
+    # «Списать с меня» без ненадёжного сравнения ФИО.
+    for sender, point in ((sender1, store1), (sender2, store2)):
+        if point and not sender.employee_id:
+            employee = Employee.query.filter_by(store_id=point.id, is_active=True).order_by(Employee.id).first()
+            if employee:
+                sender.employee_id = employee.id
 
     db.session.commit()
 

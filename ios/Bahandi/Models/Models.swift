@@ -55,6 +55,8 @@ struct User: Codable, Identifiable, Hashable {
     let role: String
     var storeId: Int?
     var store: Store?
+    var employeeId: Int?
+    var employee: Employee?
     var supervisedStoreIds: [Int]?
     var isActive: Bool?
 }
