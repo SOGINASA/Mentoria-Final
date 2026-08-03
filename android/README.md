@@ -15,17 +15,17 @@ React-сайт, упакованный внутрь APK и загружаемы�
 
 ## Сборка
 ```bash
-# 1) собрать веб-бандл в assets (нужно при каждом изменении фронта)
-./build-web.sh
-
-# 2) собрать APK
+# Gradle сам пересоберёт веб-бандл с относительными URL и HashRouter,
+# если исходники front изменились, затем соберёт APK.
 ANDROID_HOME=$HOME/Library/Android/sdk \
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
-gradle assembleDebug            # или ./gradlew, если сгенерён wrapper
+./gradlew assembleDebug
 
 # APK: app/build/outputs/apk/debug/app-debug.apk
 ```
-Либо просто открыть папку `android/` в **Android Studio** и нажать Run ▶.
+Либо просто открыть папку `android/` в **Android Studio** и нажать Run ▶ — задача
+`preBuild` автоматически вызовет `build-web.sh`, поэтому в APK не попадёт обычная
+веб-сборка с абсолютными `/static/...` путями и белым экраном.
 
 ## Установка на устройство/эмулятор
 ```bash
@@ -33,8 +33,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ## Конфигурация
-- Адрес бэкенда берётся из веб-сборки (`front/.env` → `REACT_APP_API_URL`),
-  сейчас — `https://foodtrack.beast-inside.kz/mentoria`.
+- По умолчанию Android-сборка использует общий с iOS боевой API
+  `https://foodtrack.beast-inside.kz/bahandi`. Для другого окружения передайте
+  `REACT_APP_API_URL` при запуске `build-web.sh` или Gradle.
 - `applicationId` / namespace: `kz.itshechka.bahandi`.
 - `minSdk 24`, `compileSdk/targetSdk 36`, Kotlin, без лишних зависимостей
   (только `androidx.core` ради `FileProvider`).

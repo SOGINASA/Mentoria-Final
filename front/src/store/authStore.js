@@ -28,6 +28,9 @@ export const useAuthStore = create((set, get) => ({
   async login(identifier, password) {
     set({ error: null });
     const data = await authApi.login(identifier, password);
+    if (!data?.access_token || !data?.refresh_token || !data?.user?.role) {
+      throw new Error('Сервер вернул некорректный ответ при входе');
+    }
     tokenStore.set({ access: data.access_token, refresh: data.refresh_token });
     set({ user: data.user, status: 'authed' });
     return data.user;
@@ -37,6 +40,9 @@ export const useAuthStore = create((set, get) => ({
   async loginWithBiometric(identifier) {
     set({ error: null });
     const data = await authenticateBiometricKey(identifier);
+    if (!data?.access_token || !data?.refresh_token || !data?.user?.role) {
+      throw new Error('Сервер вернул некорректный ответ при входе');
+    }
     tokenStore.set({ access: data.access_token, refresh: data.refresh_token });
     set({ user: data.user, status: 'authed' });
     return data.user;
