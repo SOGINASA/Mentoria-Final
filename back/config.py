@@ -47,20 +47,14 @@ class Config:
     # Базовый публичный URL бэкенда (для формирования абсолютных ссылок на фото)
     API_BASE_URL = os.environ.get('API_BASE_URL', 'http://localhost:5252')
 
-    # ── Распознавание продукции (тип + испорченность) ──────────────────────
-    # Две YOLOv8-модели: детектор продукта + классификатор состояния.
+    # ── Распознавание продукции ────────────────────────────────────────────
+    # Одна YOLO-модель ml/best.pt; её классы проверяются по ml/data.yaml.
     # RECOGNITION_ENABLED=0 полностью отключает инференс (бэкенд стартует без
     # ultralytics/torch). Если веса не найдены — загрузка фото продолжит
     # работать, но без подсказок ИИ (best-effort).
     RECOGNITION_ENABLED = os.environ.get('RECOGNITION_ENABLED', '1') not in ('0', 'false', 'False', '')
-    DETECTOR_MODEL_PATH = os.environ.get(
-        'DETECTOR_MODEL_PATH',
-        os.path.join(ML_DIR, 'runs', 'detect', 'runs', 'writeoff_detector-3', 'weights', 'best.pt'),
-    )
-    CLASSIFIER_MODEL_PATH = os.environ.get(
-        'CLASSIFIER_MODEL_PATH',
-        os.path.join(ML_DIR, 'runs', 'classify', 'runs', 'writeoff_classifier', 'weights', 'best.pt'),
-    )
+    RECOGNITION_MODEL_PATH = os.environ.get('RECOGNITION_MODEL_PATH', os.path.join(ML_DIR, 'best.pt'))
+    RECOGNITION_DATA_PATH = os.environ.get('RECOGNITION_DATA_PATH', os.path.join(ML_DIR, 'data.yaml'))
     RECOGNITION_CONF = float(os.environ.get('RECOGNITION_CONF', '0.3'))  # порог детекции
 
     # Аналитика: средняя оценочная стоимость одного списания (₸).

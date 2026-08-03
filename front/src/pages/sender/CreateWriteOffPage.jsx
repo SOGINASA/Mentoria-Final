@@ -122,6 +122,7 @@ export default function CreateWriteOffPage() {
         deduction_employee_id: wtype === TYPE_WITH_DEDUCTION ? employeeId : undefined,
         comment: comment.trim(),
         photo_urls: photos.map((p) => p.url),
+        items: productName.trim() ? [{ product_name: productName.trim(), quantity: 1 }] : [],
       });
       showToast(t.sent_toast);
       navigate('/my-requests', { replace: true });
@@ -413,6 +414,7 @@ export default function CreateWriteOffPage() {
 
 // Состояние от классификатора → цвет/подпись
 const STATE_META = {
+  detected: { label: 'распознан', tint: 'var(--green-tint)', fg: 'var(--green)' },
   spoiled: { label: 'испорчен', tint: 'var(--red-tint)', fg: 'var(--red)' },
   defect:  { label: 'повреждён', tint: 'var(--orange-tint)', fg: 'var(--orange)' },
   good:    { label: 'годен', tint: 'var(--gst-tint)', fg: 'var(--gst)' },

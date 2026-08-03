@@ -1,165 +1,123 @@
-"""Распознавание продукции на фото: тип (детектор) + испорченность (классификатор).
-
-Двухступенчатый пайплайн на двух YOLOv8-моделях (логика из ml/inference_pipeline.py,
-адаптированная под бэкенд: модели грузятся ОДИН раз и переиспользуются):
-    1. Детектор  → bbox + класс продукта (patty / bun / tomato / potato ...)
-    2. Классификатор каждого crop'а → состояние (good / defect / spoiled)
-    3. Формирование подсказок по списанию (нужно ли списывать + причина)
-
-Всё best-effort: если ultralytics/torch не установлены, веса не найдены или
-инференс упал — функция возвращает None, и загрузка фото работает как раньше,
-просто без подсказок ИИ.
-"""
+"""Product recognition using the single YOLO detector in ``ml/best.pt``."""
 
 import logging
+import os
 import threading
 
+import yaml
 from flask import current_app
 
 log = logging.getLogger(__name__)
 
-# Причины списания — автоматически предлагаются на основе (продукт, состояние).
-WRITEOFF_REASONS = {
-    ("tomato", "spoiled"): "Помидор не соответствует стандартам (несвежий)",
-    ("tomato", "defect"):  "Помидор повреждён (помятый/деформированный)",
-    ("patty",  "defect"):  "Котлета не пригодна (упала/повреждена по санитарным нормам)",
-    ("patty",  "spoiled"): "Котлета не пригодна к повторному использованию",
-    ("bun",    "defect"):  "Булочка повреждена (помятая/деформированная)",
-    ("bun",    "spoiled"): "Булочка не соответствует стандартам",
-    ("potato", "spoiled"): "Картофель не соответствует стандартам качества",
-    ("potato", "defect"):  "Картофель повреждён",
-}
-
 PRODUCT_NAMES_RU = {
-    "patty":   "Котлета",
-    "bun":     "Булочка",
-    "tomato":  "Помидор",
-    "onion":   "Лук",
-    "cheese":  "Сыр",
     "lettuce": "Салат",
-    "potato":  "Картофель",
+    "onion": "Лук",
+    "pickle": "Маринованный огурец",
+    "tomato": "Помидор",
 }
 
-BAD_STATES = ("defect", "spoiled")
-
-# Кэш загруженных моделей. Грузим лениво и под локом — модели тяжёлые,
-# параллельная загрузка двух одинаковых не нужна.
-_detector = None
-_classifier = None
+_model = None
 _load_lock = threading.Lock()
-# Один воркер gunicorn запускается с --threads 8; одну YOLO-модель нельзя гонять
-# из нескольких потоков одновременно — сериализуем сам инференс этим локом.
 _infer_lock = threading.Lock()
-_load_failed = False  # один раз не смогли загрузить → больше не пытаемся
+_load_failed = False
 
 
 def is_enabled():
-    return bool(current_app.config.get('RECOGNITION_ENABLED'))
+    return bool(current_app.config.get("RECOGNITION_ENABLED"))
 
 
-def _load_models():
-    """Лениво загружает обе модели. Возвращает (detector, classifier) или
-    (None, None), если недоступно. Потокобезопасно."""
-    global _detector, _classifier, _load_failed
-    if _detector is not None and _classifier is not None:
-        return _detector, _classifier
+def _classes_from_yaml(path):
+    """Read the canonical class list from data.yaml."""
+    with open(path, "r", encoding="utf-8") as stream:
+        data = yaml.safe_load(stream) or {}
+    names = data.get("names")
+    if isinstance(names, dict):
+        names = [names[key] for key in sorted(names, key=lambda value: int(value))]
+    if not isinstance(names, list) or not names:
+        raise ValueError("data.yaml must contain a non-empty 'names' list")
+    if data.get("nc") is not None and int(data["nc"]) != len(names):
+        raise ValueError("data.yaml 'nc' does not match the number of names")
+    return [str(name) for name in names]
+
+
+def _load_model():
+    """Load and cache only the new detector, validating its classes against data.yaml."""
+    global _model, _load_failed
+    if _model is not None:
+        return _model
     if _load_failed:
-        return None, None
+        return None
 
     with _load_lock:
-        if _detector is not None and _classifier is not None:
-            return _detector, _classifier
+        if _model is not None:
+            return _model
         if _load_failed:
-            return None, None
+            return None
 
-        det_path = current_app.config['DETECTOR_MODEL_PATH']
-        cls_path = current_app.config['CLASSIFIER_MODEL_PATH']
+        model_path = current_app.config["RECOGNITION_MODEL_PATH"]
+        data_path = current_app.config["RECOGNITION_DATA_PATH"]
         try:
-            import os
-            if not os.path.exists(det_path) or not os.path.exists(cls_path):
-                log.warning('Распознавание выключено: веса не найдены (детектор=%s, классификатор=%s)',
-                            det_path, cls_path)
-                _load_failed = True
-                return None, None
+            if not os.path.isfile(model_path) or not os.path.isfile(data_path):
+                raise FileNotFoundError(f"model={model_path}, data={data_path}")
+
             from ultralytics import YOLO
-            log.info('Загрузка моделей распознавания: %s, %s', det_path, cls_path)
-            _detector = YOLO(det_path)
-            _classifier = YOLO(cls_path)
-            return _detector, _classifier
-        except Exception as e:  # ultralytics/torch не установлены или битые веса
-            log.warning('Не удалось загрузить модели распознавания: %s', e)
+
+            model = YOLO(model_path)
+            yaml_names = _classes_from_yaml(data_path)
+            model_names = [str(model.names[index]) for index in sorted(model.names)]
+            if model_names != yaml_names:
+                raise ValueError(
+                    f"model classes {model_names!r} do not match data.yaml {yaml_names!r}"
+                )
+            _model = model
+            log.info("Loaded recognition model %s with classes %s", model_path, yaml_names)
+            return _model
+        except Exception as exc:
+            log.warning("Product recognition is unavailable: %s", exc)
             _load_failed = True
-            return None, None
+            return None
 
 
 def recognize(image_path):
-    """Прогоняет фото через детектор + классификатор. Возвращает dict в формате
-    ответа API (см. ниже) или None, если распознавание недоступно/упало.
+    """Detect products and return the existing upload API response shape.
 
-    Формат:
-        {
-          "detected_items": [
-            {product, state, requires_writeoff, suggested_reason, confidence}, ...
-          ],
-          "writeoff_required": bool,
-          "total_detected": int,
-          "total_for_writeoff": int,
-          "suggested_reason": str | None   # причина для самого уверенного «плохого»
-        }
+    The new model detects ingredient classes only; it does not classify freshness.
+    Consequently ``state`` is ``detected`` and no write-off decision is fabricated.
     """
     if not is_enabled():
         return None
 
-    detector, classifier = _load_models()
-    if detector is None or classifier is None:
+    model = _load_model()
+    if model is None:
         return None
 
     try:
-        from PIL import Image
-        conf = current_app.config.get('RECOGNITION_CONF', 0.3)
-        image = Image.open(image_path).convert('RGB')
-
+        confidence = current_app.config.get("RECOGNITION_CONF", 0.3)
         items = []
-        with _infer_lock:  # сериализуем доступ к моделям внутри воркера
-            det_results = detector(image_path, conf=conf, verbose=False)
-            for result in det_results:
-                names = result.names  # {idx: class_name}
+        with _infer_lock:
+            results = model(image_path, conf=confidence, verbose=False)
+            for result in results:
                 for box in result.boxes:
-                    cls_idx = int(box.cls[0])
-                    product = names[cls_idx]
-                    conf_det = float(box.conf[0])
-                    x1, y1, x2, y2 = [int(v) for v in box.xyxy[0]]
-
-                    crop = image.crop((x1, y1, x2, y2))
-                    state_res = classifier(crop, verbose=False)[0]
-                    probs = state_res.probs
-                    state = state_res.names[int(probs.top1)]
-                    conf_state = float(probs.top1conf)
-
-                    requires = state in BAD_STATES
-                    reason = WRITEOFF_REASONS.get((product, state)) if requires else None
+                    class_index = int(box.cls[0])
+                    class_name = str(result.names[class_index])
+                    class_key = class_name.casefold()
                     items.append({
-                        'product': PRODUCT_NAMES_RU.get(product, product),
-                        'product_key': product,
-                        'state': state,
-                        'requires_writeoff': requires,
-                        'suggested_reason': reason,
-                        'confidence': round((conf_det + conf_state) / 2, 3),
+                        "product": PRODUCT_NAMES_RU.get(class_key, class_name),
+                        "product_key": class_key,
+                        "state": "detected",
+                        "requires_writeoff": False,
+                        "suggested_reason": None,
+                        "confidence": round(float(box.conf[0]), 3),
                     })
 
-        # «Плохие» — вперёд, по убыванию уверенности.
-        items.sort(key=lambda it: (it['requires_writeoff'], it['confidence']), reverse=True)
-
-        bad = [it for it in items if it['requires_writeoff']]
-        top_reason = next((it['suggested_reason'] for it in bad if it['suggested_reason']), None)
-
+        items.sort(key=lambda item: item["confidence"], reverse=True)
         return {
-            'detected_items': items,
-            'writeoff_required': bool(bad),
-            'total_detected': len(items),
-            'total_for_writeoff': len(bad),
-            'suggested_reason': top_reason,
+            "detected_items": items,
+            "writeoff_required": False,
+            "total_detected": len(items),
+            "total_for_writeoff": 0,
+            "suggested_reason": None,
         }
-    except Exception as e:
-        log.warning('Ошибка распознавания фото %s: %s', image_path, e)
+    except Exception as exc:
+        log.warning("Recognition failed for %s: %s", image_path, exc)
         return None

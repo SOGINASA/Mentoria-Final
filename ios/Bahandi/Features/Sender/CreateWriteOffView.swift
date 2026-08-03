@@ -427,6 +427,9 @@ struct CreateWriteOffView: View {
                 "deduction_employee_id": wtype == WType.withDeduction ? employeeId : nil,
                 "comment": comment.trimmingCharacters(in: .whitespacesAndNewlines),
                 "photo_urls": photos.map(\.url),
+                "items": productName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? []
+                    : [["product_name": productName.trimmingCharacters(in: .whitespacesAndNewlines), "quantity": 1]],
             ])
             settings.showToast(settings.t("sent_toast"))
             reset()
