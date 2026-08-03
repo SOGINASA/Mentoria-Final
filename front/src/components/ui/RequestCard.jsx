@@ -12,8 +12,9 @@ export default function RequestCard({ wo, onClick, variant = 'type' }) {
   const point = wo.store?.name || '—';
   const date = dateLabel(wo.created_at, lang);
   const typeLabel = wo.type === TYPE_WITH_DEDUCTION ? t.type_hold : t.type_nohold;
-  const title = variant === 'author' ? wo.author?.full_name || '—' : typeLabel;
-  const sub = variant === 'author' ? `${point} · ${date}` : point;
+  // Товар — главный ориентир в списке; для старых заявок остаётся тип списания.
+  const title = variant === 'author' ? wo.author?.full_name || '—' : wo.product_name || wo.items?.[0]?.product_name || typeLabel;
+  const sub = variant === 'author' ? `${point} · ${date}` : `${point} · ${typeLabel}`;
 
   return (
     <button

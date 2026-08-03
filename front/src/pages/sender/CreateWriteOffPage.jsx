@@ -8,7 +8,8 @@ import { useI18n } from '../../i18n/useI18n';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
 import { useWriteOffStore } from '../../store/writeOffStore';
-import { uploadPhoto } from '../../api/uploads.api';
+import { uploadPhoto, recognizePhoto } from '../../api/uploads.api';
+import { compressImage } from '../../utils/imageCompression';
 import { TYPE_NO_DEDUCTION, TYPE_WITH_DEDUCTION, MIN_COMMENT_LENGTH, MAX_PHOTOS } from '../../constants/writeOffTypes';
 import { initials } from '../../utils/format';
 
@@ -25,7 +26,8 @@ export default function CreateWriteOffPage() {
   const [uploading, setUploading] = useState(false);
   const [storeId, setStoreId] = useState(null);
   const [wtype, setWtype] = useState('');
-  const [employeeId, setEmployeeId] = useState(null);
+  const [employeeIds, setEmployeeIds] = useState([]);
+  const [deductAll, setDeductAll] = useState(false);
   const [comment, setComment] = useState('');
   const [productName, setProductName] = useState(''); // только фронт (бэк пока не подвязан)
   const [empQuery, setEmpQuery] = useState('');
@@ -49,7 +51,8 @@ export default function CreateWriteOffPage() {
   }, [wtype, storeId, loadEmployees]);
 
   const steps = useMemo(() => {
-    const base = ['photo', 'point', 'type'];
+    // Точка закреплена за отправителем — выбирать её в мастере нельзя.
+    const base = ['photo', 'type'];
     if (wtype === TYPE_WITH_DEDUCTION) base.push('employee');
     base.push('comment');
     return base;
@@ -64,13 +67,13 @@ export default function CreateWriteOffPage() {
   }, [cur, voice.listening]); // eslint-disable-line react-hooks/exhaustive-deps
   const commentLen = comment.trim().length;
   const store = stores.find((s) => s.id === storeId);
-  const employee = employees.find((e) => e.id === employeeId);
+  const selectedEmployees = employees.filter((e) => employeeIds.includes(e.id));
 
   const valid = (() => {
     if (cur === 'photo') return photos.length > 0;
     if (cur === 'point') return !!storeId;
     if (cur === 'type') return !!wtype;
-    if (cur === 'employee') return !!employeeId;
+    if (cur === 'employee') return deductAll || employeeIds.length > 0;
     if (cur === 'comment') return commentLen >= MIN_COMMENT_LENGTH;
     return false;
   })();
@@ -84,11 +87,18 @@ export default function CreateWriteOffPage() {
     try {
       for (const file of files) {
         if (photos.length >= MAX_PHOTOS) break;
-        const { url, recognition } = await uploadPhoto(file);
+        const compact = await compressImage(file);
+        // URL возвращается сразу; тяжёлый ML-инференс запускается вторым запросом.
+        const { url, filename, recognition } = await uploadPhoto(compact);
         setPhotos((prev) => (prev.length >= MAX_PHOTOS ? prev : [...prev, { url, recognition }]));
         // Автозаполнение причины: первая «плохая» позиция от ИИ, если поле пустое
         const reason = recognition?.suggested_reason;
         if (reason) setComment((c) => (c.trim() ? c : reason));
+        recognizePhoto(filename).then(({ recognition: ai }) => {
+          if (!ai) return;
+          setPhotos((prev) => prev.map((p) => p.url === url ? { ...p, recognition: ai } : p));
+          if (ai.suggested_reason) setComment((c) => (c.trim() ? c : ai.suggested_reason));
+        }).catch(() => {}); // ИИ — подсказка, ошибка не должна ломать отправку.
       }
     } catch (err) {
       setError(err.message);
@@ -119,7 +129,9 @@ export default function CreateWriteOffPage() {
       await create({
         store_id: storeId,
         type: wtype,
-        deduction_employee_id: wtype === TYPE_WITH_DEDUCTION ? employeeId : undefined,
+        deduction_employee_ids: wtype === TYPE_WITH_DEDUCTION ? employeeIds : undefined,
+        deduct_all: wtype === TYPE_WITH_DEDUCTION ? deductAll : undefined,
+        items: productName.trim() ? [{ product_name: productName.trim() }] : undefined,
         comment: comment.trim(),
         photo_urls: photos.map((p) => p.url),
       });
@@ -250,7 +262,7 @@ export default function CreateWriteOffPage() {
               sub={t.type_nohold_sub}
               onClick={() => {
                 setWtype(TYPE_NO_DEDUCTION);
-                setEmployeeId(null);
+                setEmployeeIds([]); setDeductAll(false);
               }}
             />
             <TypeCard
@@ -279,12 +291,22 @@ export default function CreateWriteOffPage() {
                 className="flex-1 border-none outline-none bg-transparent text-sm text-text"
               />
             </div>
-            {filteredEmps.map((e) => {
-              const checked = employeeId === e.id;
+            <button
+              type="button"
+              onClick={() => { setDeductAll((v) => !v); setEmployeeIds([]); }}
+              className="flex items-center gap-3.5 p-3 rounded-2xl cursor-pointer text-left bg-surface border-[1.5px] transition"
+              style={{ borderColor: deductAll ? 'var(--green)' : 'var(--line)' }}
+            >
+              <div className="w-10 h-10 flex-none rounded-full bg-green-tint text-green grid place-items-center"><Icon name="users" size={19} /></div>
+              <div className="flex-1 font-semibold text-[14.5px] text-text">{t.deduct_all}</div>
+              {deductAll && <CheckDot />}
+            </button>
+            {!deductAll && filteredEmps.map((e) => {
+              const checked = employeeIds.includes(e.id);
               return (
                 <button
                   key={e.id}
-                  onClick={() => setEmployeeId(e.id)}
+                  onClick={() => setEmployeeIds((ids) => checked ? ids.filter((id) => id !== e.id) : [...ids, e.id])}
                   className="flex items-center gap-3.5 p-3 rounded-2xl cursor-pointer text-left bg-surface border-[1.5px] transition"
                   style={{ borderColor: checked ? 'var(--green)' : 'var(--line)' }}
                 >
@@ -378,7 +400,7 @@ export default function CreateWriteOffPage() {
                 {productName.trim() && <SummaryRow label={t.f_product} value={productName.trim()} />}
                 <SummaryRow label={t.f_point} value={store?.name || '—'} />
                 <SummaryRow label={t.f_type} value={wtype === TYPE_WITH_DEDUCTION ? t.type_hold : t.type_nohold} />
-                {wtype === TYPE_WITH_DEDUCTION && <SummaryRow label={t.f_emp} value={employee?.full_name || '—'} />}
+                {wtype === TYPE_WITH_DEDUCTION && <SummaryRow label={t.f_emp} value={deductAll ? t.deduct_all_short : (selectedEmployees.map((e) => e.full_name).join(', ') || '—')} />}
                 <SummaryRow label={t.f_photos} value={`${photos.length} ${t.photos_n}`} />
               </div>
             </div>

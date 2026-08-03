@@ -56,6 +56,10 @@ struct InfoCardView: View {
         VStack(spacing: 0) {
             row(settings.t("f_point"), value: wo.store?.name ?? "—")
             Divider().background(AppColor.line2)
+            if let product = wo.productName ?? wo.items?.first?.productName {
+                row(settings.t("f_product"), value: product)
+                Divider().background(AppColor.line2)
+            }
             HStack {
                 Text(settings.t("f_type")).font(.system(size: 13)).foregroundColor(AppColor.muted)
                 Spacer()
@@ -63,7 +67,10 @@ struct InfoCardView: View {
                 else { Text(settings.t(typeLabelKey(wo.type))).font(.system(size: 13, weight: .semibold)).foregroundColor(AppColor.text) }
             }
             .padding(.horizontal, 15).padding(.vertical, 13)
-            if let emp = wo.deductionEmployee {
+            if let emps = wo.deductionEmployees, !emps.isEmpty {
+                Divider().background(AppColor.line2)
+                row(settings.t("f_emp"), value: wo.deductAll == true ? settings.t("deduct_all_short") : emps.map(\.fullName).joined(separator: ", "))
+            } else if let emp = wo.deductionEmployee {
                 Divider().background(AppColor.line2)
                 row(settings.t("f_emp"), value: emp.fullName)
             }

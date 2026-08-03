@@ -4,6 +4,8 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 
 from models import Store, Employee
+from utils.auth_helpers import get_current_user
+from constants import ROLE_SENDER
 
 stores_bp = Blueprint('stores', __name__)
 
@@ -13,7 +15,13 @@ stores_bp = Blueprint('stores', __name__)
 @jwt_required()
 def list_stores():
     """Список активных торговых точек (для выбора в форме)."""
-    stores = Store.query.filter_by(is_active=True).order_by(Store.name).all()
+    user = get_current_user()
+    query = Store.query.filter_by(is_active=True)
+    # У отправителя одна закреплённая точка; не показываем остальные даже если
+    # старый клиент всё ещё вызывает этот эндпоинт.
+    if user.role == ROLE_SENDER and user.store_id:
+        query = query.filter_by(id=user.store_id)
+    stores = query.order_by(Store.name).all()
     return jsonify({'stores': [s.to_dict() for s in stores]})
 
 

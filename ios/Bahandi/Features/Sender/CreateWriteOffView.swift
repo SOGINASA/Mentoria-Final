@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 struct CreateWriteOffView: View {
     @EnvironmentObject var settings: AppSettings
@@ -15,7 +16,8 @@ struct CreateWriteOffView: View {
     @State private var uploading = false
     @State private var storeId: Int?
     @State private var wtype = ""
-    @State private var employeeId: Int?
+    @State private var employeeIds: Set<Int> = []
+    @State private var deductAll = false
     @State private var comment = ""
     @State private var productName = "" // только фронт (бэк подвяжем позже)
     @State private var empQuery = ""
@@ -30,7 +32,8 @@ struct CreateWriteOffView: View {
     private let maxPhotos = 4
 
     private var steps: [String] {
-        var s = ["photo", "point", "type"]
+        // У отправителя ровно одна закреплённая точка.
+        var s = ["photo", "type"]
         if wtype == WType.withDeduction { s.append("employee") }
         s.append("comment")
         return s
@@ -44,7 +47,7 @@ struct CreateWriteOffView: View {
         case "photo": return !photos.isEmpty
         case "point": return storeId != nil
         case "type": return !wtype.isEmpty
-        case "employee": return employeeId != nil
+        case "employee": return deductAll || !employeeIds.isEmpty
         case "comment": return commentLen >= minComment
         default: return false
         }
@@ -187,6 +190,18 @@ struct CreateWriteOffView: View {
 
     private var employeeStep: some View {
         VStack(spacing: 10) {
+            HStack(spacing: 13) {
+                Image(systemName: "person.3.fill").foregroundColor(AppColor.green)
+                Text(settings.t("deduct_all")).font(.system(size: 14.5, weight: .semibold)).foregroundColor(AppColor.text)
+                Spacer()
+                if deductAll { checkDot }
+            }
+            .padding(13).background(AppColor.surface)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(deductAll ? AppColor.green : AppColor.line, lineWidth: 1.5))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .onTapGesture { deductAll.toggle(); employeeIds.removeAll() }
+
+            if !deductAll {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundColor(AppColor.faint)
                 TextField(settings.t("search_emp"), text: $empQuery)
@@ -203,13 +218,14 @@ struct CreateWriteOffView: View {
                         if let p = e.position { Text(p).font(.system(size: 12)).foregroundColor(AppColor.muted) }
                     }
                     Spacer()
-                    if employeeId == e.id { checkDot }
+                    if employeeIds.contains(e.id) { checkDot }
                 }
                 .padding(13)
                 .background(AppColor.surface)
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(employeeId == e.id ? AppColor.green : AppColor.line, lineWidth: 1.5))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(employeeIds.contains(e.id) ? AppColor.green : AppColor.line, lineWidth: 1.5))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .onTapGesture { employeeId = e.id }
+                .onTapGesture { if employeeIds.contains(e.id) { employeeIds.remove(e.id) } else { employeeIds.insert(e.id) } }
+            }
             }
         }
     }
@@ -262,7 +278,7 @@ struct CreateWriteOffView: View {
                 }
                 summaryRow(settings.t("f_point"), store.stores.first { $0.id == storeId }?.name ?? "—")
                 summaryRow(settings.t("f_type"), settings.t(typeLabelKey(wtype)))
-                if wtype == WType.withDeduction { summaryRow(settings.t("f_emp"), store.employees.first { $0.id == employeeId }?.fullName ?? "—") }
+                if wtype == WType.withDeduction { summaryRow(settings.t("f_emp"), deductAll ? settings.t("deduct_all_short") : store.employees.filter { employeeIds.contains($0.id) }.map(\.fullName).joined(separator: ", ")) }
                 summaryRow(settings.t("f_photos"), "\(photos.count)")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -326,7 +342,7 @@ struct CreateWriteOffView: View {
         .padding(18).background(active ? tint : AppColor.surface)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(active ? fg : AppColor.line, lineWidth: 2))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .onTapGesture { wtype = type; if type == WType.noDeduction { employeeId = nil } }
+        .onTapGesture { wtype = type; if type == WType.noDeduction { employeeIds.removeAll(); deductAll = false } }
     }
 
     private var checkDot: some View {
@@ -396,13 +412,25 @@ struct CreateWriteOffView: View {
     private func upload(_ data: Data) async {
         uploading = true; error = nil
         do {
-            let r = try await APIClient.shared.uploadPhoto(data)
+            // Ограничиваем длинную сторону: заметно быстрее сеть и сервер,
+            // визуального качества для подтверждающего фото достаточно.
+            let compact = compressedPhoto(data)
+            let r = try await APIClient.shared.uploadPhoto(compact, recognize: false)
             if photos.count < maxPhotos {
                 photos.append(UploadedPhoto(url: r.url, recognition: r.recognition))
                 // Автозаполнение причины из подсказки ИИ, если комментарий ещё пуст
                 if let reason = r.recognition?.suggestedReason,
                    comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     comment = reason
+                }
+                let url = r.url
+                Task {
+                    guard let recognition = try? await APIClient.shared.recognizePhoto(r.filename) else { return }
+                    if let index = photos.firstIndex(where: { $0.url == url }) {
+                        photos[index] = UploadedPhoto(url: url, recognition: recognition)
+                    }
+                    if let reason = recognition.suggestedReason,
+                       comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { comment = reason }
                 }
             }
         }
@@ -424,7 +452,9 @@ struct CreateWriteOffView: View {
             _ = try await store.create([
                 "store_id": storeId,
                 "type": wtype,
-                "deduction_employee_id": wtype == WType.withDeduction ? employeeId : nil,
+                "deduction_employee_ids": wtype == WType.withDeduction ? Array(employeeIds) : nil,
+                "deduct_all": wtype == WType.withDeduction ? deductAll : nil,
+                "items": productName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : [["product_name": productName.trimmingCharacters(in: .whitespacesAndNewlines)]],
                 "comment": comment.trimmingCharacters(in: .whitespacesAndNewlines),
                 "photo_urls": photos.map(\.url),
             ])
@@ -438,7 +468,16 @@ struct CreateWriteOffView: View {
 
     private func reset() {
         speech.stop()
-        stepIndex = 0; photos = []; storeId = auth.user?.storeId; wtype = ""; employeeId = nil; comment = ""; productName = ""; empQuery = ""
+        stepIndex = 0; photos = []; storeId = auth.user?.storeId; wtype = ""; employeeIds = []; deductAll = false; comment = ""; productName = ""; empQuery = ""
+    }
+
+    private func compressedPhoto(_ data: Data) -> Data {
+        guard let image = UIImage(data: data) else { return data }
+        let maxSide: CGFloat = 1600
+        let scale = min(1, maxSide / max(image.size.width, image.size.height))
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }.jpegData(compressionQuality: 0.78) ?? data
     }
 }
 

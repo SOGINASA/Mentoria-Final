@@ -55,6 +55,7 @@ struct User: Codable, Identifiable, Hashable {
     let role: String
     var storeId: Int?
     var store: Store?
+    var supervisedStoreIds: [Int]?
     var isActive: Bool?
 }
 
@@ -65,6 +66,10 @@ struct WriteOff: Codable, Identifiable, Hashable {
     let type: String
     var deductionEmployeeId: Int?
     var deductionEmployee: Employee?
+    var deductionEmployees: [Employee]?
+    var deductAll: Bool?
+    var productName: String?
+    var items: [WriteOffItem]?
     let comment: String
     let status: String
     var reviewer: UserRef?
@@ -76,6 +81,7 @@ struct WriteOff: Codable, Identifiable, Hashable {
     var author: UserRef?
     var createdAt: String?
 }
+struct WriteOffItem: Codable, Hashable { let productName: String; var quantity: Double?; var unit: String? }
 
 struct Pagination: Codable { let page: Int; let perPage: Int; let total: Int; let pages: Int }
 struct Stats: Codable { let pending: Int; let approved: Int; let rejected: Int; let total: Int

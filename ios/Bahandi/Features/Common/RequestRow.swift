@@ -7,7 +7,7 @@ struct RequestRow: View {
 
     var body: some View {
         let date = dateLabel(wo.createdAt, lang: settings.lang)
-        let title = showAuthor ? (wo.author?.fullName ?? "—") : settings.t(typeLabelKey(wo.type))
+        let title = showAuthor ? (wo.author?.fullName ?? "—") : (wo.productName ?? wo.items?.first?.productName ?? settings.t(typeLabelKey(wo.type)))
         let sub = showAuthor ? "\(wo.store?.name ?? "—") · \(date)" : (wo.store?.name ?? "—")
 
         HStack(spacing: 13) {
