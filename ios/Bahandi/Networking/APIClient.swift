@@ -118,7 +118,7 @@ final class APIClient {
     // MARK: - Загрузка фото (multipart)
     func uploadPhoto(_ imageData: Data, filename: String = "photo.jpg", recognize: Bool = false) async throws -> UploadResponse {
         let boundary = "Boundary-\(UUID().uuidString)"
-        var req = URLRequest(url: apiURL.appendingPathComponent("uploads/photo"))
+        var req = URLRequest(url: apiURL.appendingPathComponent("uploads/photo"), timeoutInterval: 30)
         req.httpMethod = "POST"
         if let token = TokenStore.access { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -134,7 +134,15 @@ final class APIClient {
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         req.httpBody = body
 
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch let urlError as URLError where urlError.code == .timedOut {
+            throw APIError(message: "Сервер не ответил при загрузке фото. Попробуйте ещё раз.", status: 0)
+        } catch {
+            throw APIError(message: "Нет соединения с сервером", status: 0)
+        }
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw APIError(message: "Не удалось загрузить фото", status: 0)
         }

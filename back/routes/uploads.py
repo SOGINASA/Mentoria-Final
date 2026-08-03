@@ -17,7 +17,7 @@ from services import recognition
 uploads_bp = Blueprint('uploads', __name__)
 
 
-def _truthy(v, default=True):
+def _truthy(v, default=False):
     if v is None:
         return default
     return str(v).strip().lower() not in ('0', 'false', 'no', '')
@@ -40,7 +40,10 @@ def upload_photo():
         return jsonify({'error': str(e)}), 400
 
     result = None
-    if _truthy(request.form.get('recognize'), default=True):
+    # Быстрая загрузка — режим по умолчанию. Инференс запускается только по
+    # явному recognize=1; отсутствие/потеря multipart-поля больше не способно
+    # подвесить upload на десятки секунд.
+    if _truthy(request.form.get('recognize'), default=False):
         # Синхронный режим (best-effort: ошибки не должны рушить загрузку).
         file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
         result = recognition.recognize(file_path)
