@@ -13,7 +13,7 @@ export default function PlatformNotificationsPage() {
   const navigate = useNavigate();
   const role = useAuthStore((s) => s.user?.role);
   const { p, lang } = usePlatformCopy();
-  const { items, loading, unread, fetchList, markRead, markAllRead } = useNotifyStore();
+  const { items, loading, error, unread, fetchList, markRead, markAllRead } = useNotifyStore();
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function PlatformNotificationsPage() {
           ['all', 'Все', items.length],
           ['unread', 'Новые', unread],
         ].map(([value, label, count]) => (
-          <button key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value)} className={`min-h-10 cursor-pointer rounded-xl px-4 text-[12px] font-bold transition-colors active:scale-[.98] ${filter === value ? 'bg-green text-white' : 'text-muted hover:bg-surface2'}`}>
+          <button key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value)} className={`min-h-10 cursor-pointer rounded-xl px-4 text-[12px] font-bold transition-colors active:scale-[.98] ${filter === value ? 'bg-brand text-on-brand' : 'text-muted hover:bg-surface2'}`}>
             {label} <span className="ml-1 opacity-75">{count}</span>
           </button>
         ))}
@@ -50,6 +50,15 @@ export default function PlatformNotificationsPage() {
       <div className="mt-5">
         {loading ? (
           <PlatformCard className="grid min-h-64 place-items-center"><Spinner size={30} /></PlatformCard>
+        ) : error ? (
+          <PlatformCard className="grid min-h-64 place-items-center p-6 text-center">
+            <div>
+              <IconTile icon="alertTriangle" tone="red" />
+              <h2 className="mb-2 mt-4 font-head text-[22px] font-semibold text-text">Не удалось загрузить уведомления</h2>
+              <p className="m-0 max-w-sm text-[13px] leading-relaxed text-muted">{error}</p>
+              <PlatformButton className="mt-5" icon="refresh" onClick={() => fetchList({ per_page: 50 })}>Попробовать снова</PlatformButton>
+            </div>
+          </PlatformCard>
         ) : filtered.length === 0 ? (
           <EmptyPlatformState icon="bell" title={filter === 'unread' ? 'Новых уведомлений нет' : 'Уведомлений пока нет'} subtitle="Когда появятся изменения по вашим рабочим процессам, они будут собраны здесь." />
         ) : (

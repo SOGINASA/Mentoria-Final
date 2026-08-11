@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import Icon from '../../components/ui/Icon';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
+import { usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
 import PlatformModal from '../components/PlatformModal';
 import {
@@ -15,7 +16,6 @@ import {
   StatusPill,
 } from '../components/PlatformUi';
 
-const baseDate = new Date(2026, 7, 10);
 const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const weekdayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
@@ -25,6 +25,25 @@ function addDays(date, amount) {
   return next;
 }
 
+function startOfWeek(date) {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  const weekday = (normalized.getDay() + 6) % 7;
+  return addDays(normalized, -weekday);
+}
+
+function fullDateLabel(date, isToday = false) {
+  const formatted = new Intl.DateTimeFormat('ru-RU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(date);
+  const label = formatted.replace(/^./, (letter) => letter.toUpperCase());
+  return isToday ? `Сегодня, ${label.split(', ')[1]}` : label;
+}
+
+const baseDate = startOfWeek(new Date());
+
 function dayKey(date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
@@ -33,6 +52,7 @@ export default function PlatformShiftsPage() {
   const { p } = usePlatformCopy();
   const user = useAuthStore((s) => s.user);
   const showToast = useUiStore((s) => s.showToast);
+  const createShiftRequest = usePlatformStore((state) => state.createShiftRequest);
   const [view, setView] = useState('week');
   const [periodOffset, setPeriodOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(dayKey(addDays(baseDate, 1)));
@@ -54,7 +74,7 @@ export default function PlatformShiftsPage() {
       };
     }
 
-    const monthDate = new Date(2026, 7 + periodOffset, 1);
+    const monthDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + periodOffset, 1);
     const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
     const firstWeekday = (monthDate.getDay() + 6) % 7;
     const days = Array.from({ length: firstWeekday + daysInMonth }, (_, index) => {
@@ -66,12 +86,29 @@ export default function PlatformShiftsPage() {
     return { days, label: monthNames[monthDate.getMonth()].replace(/^./, (letter) => letter.toUpperCase()), year: monthDate.getFullYear() };
   }, [periodOffset, view]);
 
-  const upcoming = [
-    { id: 1, date: 'Сегодня, 11 августа', time: '09:00–18:00', role: p.role_value, status: p.published, tone: 'green' },
-    { id: 2, date: 'Среда, 12 августа', time: '12:00–21:00', role: p.role_value, status: p.published, tone: 'green' },
-    { id: 3, date: 'Четверг, 13 августа', time: '09:00–18:00', role: p.role_value, status: p.published, tone: 'green' },
-    { id: 4, date: 'Суббота, 15 августа', time: '10:00–19:00', role: p.role_value, status: p.published, tone: 'green' },
-  ];
+  const upcoming = useMemo(() => {
+    const today = new Date();
+    return [
+      { id: 1, offset: 0, time: '09:00–18:00' },
+      { id: 2, offset: 1, time: '12:00–21:00' },
+      { id: 3, offset: 2, time: '09:00–18:00' },
+      { id: 4, offset: 4, time: '10:00–19:00' },
+    ].map((shift) => ({
+      ...shift,
+      date: fullDateLabel(addDays(today, shift.offset), shift.offset === 0),
+      role: p.role_value,
+      status: p.published,
+      tone: 'green',
+    }));
+  }, [p.published, p.role_value]);
+
+  const openShift = useMemo(() => ({
+    date: fullDateLabel(addDays(new Date(), 3)),
+    time: '17:00–23:00',
+    store: 'Bahandi • Достык',
+    duration: '6 часов',
+    income: '8 400 ₸',
+  }), []);
 
   function changeView(nextView) {
     setView(nextView);
@@ -84,11 +121,17 @@ export default function PlatformShiftsPage() {
   }
 
   function confirmSwap() {
+    createShiftRequest({
+      type: 'swap',
+      shiftId: modal?.shift?.id,
+      comment: reason.trim(),
+    });
     setModal(null);
     showToast(p.swap_requested);
   }
 
   function confirmOpenShift() {
+    createShiftRequest({ type: 'open_shift', shift: openShift });
     setModal(null);
     showToast(p.shift_requested);
   }
@@ -100,9 +143,21 @@ export default function PlatformShiftsPage() {
         title={p.schedule_title}
         subtitle={p.schedule_sub}
         action={
-          <div className="inline-flex rounded-2xl border border-line bg-surface p-1 shadow-card-sm" role="group" aria-label={p.schedule_title}>
+          <div
+            className="inline-flex rounded-2xl border border-line bg-surface p-1 shadow-card-sm"
+            role="group"
+            aria-label={p.schedule_title}
+          >
             {[["week", p.week], ["month", p.month]].map(([value, label]) => (
-              <button key={value} type="button" onClick={() => changeView(value)} aria-pressed={view === value} className={`min-h-10 cursor-pointer rounded-xl px-4 text-[12px] font-bold transition-[color,background-color,transform] active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${view === value ? 'bg-green text-white' : 'text-muted hover:bg-surface2'}`}>{label}</button>
+              <button
+                key={value}
+                type="button"
+                onClick={() => changeView(value)}
+                aria-pressed={view === value}
+                className={`min-h-10 cursor-pointer rounded-xl px-4 text-[12px] font-bold transition-[color,background-color,transform] active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${view === value ? 'bg-brand text-on-brand' : 'text-muted hover:bg-surface2'}`}
+              >
+                {label}
+              </button>
             ))}
           </div>
         }
@@ -110,29 +165,70 @@ export default function PlatformShiftsPage() {
 
       <PlatformCard className="mt-6 overflow-hidden p-3 sm:p-5">
         <div className="flex items-center justify-between gap-3 px-1 pb-4">
-          <button type="button" onClick={() => setPeriodOffset((value) => value - 1)} className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl border border-line text-text transition-colors hover:bg-surface2 active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green" aria-label="Предыдущий период"><Icon name="chevronLeft" size={19} /></button>
-          <button type="button" onClick={() => setPeriodOffset(0)} className="min-h-11 cursor-pointer rounded-2xl px-4 text-center transition-colors hover:bg-surface2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green" aria-label="Вернуться к текущему периоду">
-            <span className="block font-head text-[18px] font-semibold text-text">{period.label}</span>
-            <span className="mt-0.5 block text-[11px] text-muted">{period.year}{periodOffset === 0 ? ' • текущий период' : ''}</span>
+          <button
+            type="button"
+            onClick={() => setPeriodOffset((value) => value - 1)}
+            className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl border border-line text-text transition-colors hover:bg-surface2 active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
+            aria-label="Предыдущий период"
+          >
+            <Icon name="chevronLeft" size={19} />
           </button>
-          <button type="button" onClick={() => setPeriodOffset((value) => value + 1)} className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl border border-line text-text transition-colors hover:bg-surface2 active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green" aria-label="Следующий период"><Icon name="chevronRight" size={19} /></button>
+          <button
+            type="button"
+            onClick={() => setPeriodOffset(0)}
+            className="min-h-11 cursor-pointer rounded-2xl px-4 text-center transition-colors hover:bg-surface2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
+            aria-label="Вернуться к текущему периоду"
+          >
+            <span className="block font-head text-[18px] font-semibold text-text">{period.label}</span>
+            <span className="mt-0.5 block text-[11px] text-muted">
+              {period.year}{periodOffset === 0 ? ' • текущий период' : ''}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPeriodOffset((value) => value + 1)}
+            className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl border border-line text-text transition-colors hover:bg-surface2 active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
+            aria-label="Следующий период"
+          >
+            <Icon name="chevronRight" size={19} />
+          </button>
         </div>
 
         <div key={`${view}-${periodOffset}`} className="platform-content-swap">
-        {view === 'month' && <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase text-faint">{weekdayNames.map((name) => <span key={name} className="py-2">{name}</span>)}</div>}
-        <div className={`grid grid-cols-7 ${view === 'week' ? 'gap-1.5 sm:gap-2' : 'gap-1 sm:gap-2'}`}>
-          {period.days.map((day, index) => {
-            if (!day) return <span key={`empty-${index}`} />;
-            const selected = selectedDay === dayKey(day.date);
-            return (
-              <button key={dayKey(day.date)} type="button" onClick={() => { setSelectedDay(dayKey(day.date)); if (day.state === 'shift' && view === 'month') setModal({ type: 'day', day }); }} aria-pressed={selected} className={`relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border px-1 transition-[color,background-color,border-color,transform] active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${view === 'week' ? 'min-h-[82px] sm:min-h-[98px]' : 'min-h-[52px] sm:min-h-[64px]'} ${selected ? 'border-green bg-green text-white' : 'border-line bg-surface hover:bg-surface2'}`}>
-                {view === 'week' && <span className={`text-[10px] font-bold uppercase ${selected ? 'text-white/70' : 'text-muted'}`}>{day.weekday}</span>}
-                <span className={`${view === 'week' ? 'mt-1 text-[19px] sm:text-[23px]' : 'text-[14px] sm:text-[16px]'} font-head font-semibold tabular-nums`}>{day.date.getDate()}</span>
-                <span className={`mt-1.5 h-1.5 w-1.5 rounded-full ${selected ? 'bg-white' : day.state === 'shift' ? 'bg-green' : 'bg-line'}`} />
-              </button>
-            );
-          })}
-        </div>
+          {view === 'month' && (
+            <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase text-faint">
+              {weekdayNames.map((name) => <span key={name} className="py-2">{name}</span>)}
+            </div>
+          )}
+          <div className={`grid grid-cols-7 ${view === 'week' ? 'gap-1.5 sm:gap-2' : 'gap-1 sm:gap-2'}`}>
+            {period.days.map((day, index) => {
+              if (!day) return <span key={`empty-${index}`} />;
+              const selected = selectedDay === dayKey(day.date);
+              const openDay = () => {
+                setSelectedDay(dayKey(day.date));
+                if (day.state === 'shift' && view === 'month') setModal({ type: 'day', day });
+              };
+              return (
+                <button
+                  key={dayKey(day.date)}
+                  type="button"
+                  onClick={openDay}
+                  aria-pressed={selected}
+                  className={`relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border px-1 transition-[color,background-color,border-color,transform] active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${view === 'week' ? 'min-h-[82px] sm:min-h-[98px]' : 'min-h-[52px] sm:min-h-[64px]'} ${selected ? 'border-brand bg-brand text-on-brand' : 'border-line bg-surface hover:bg-surface2'}`}
+                >
+                  {view === 'week' && (
+                    <span className={`text-[10px] font-bold uppercase ${selected ? 'text-white/70' : 'text-muted'}`}>
+                      {day.weekday}
+                    </span>
+                  )}
+                  <span className={`${view === 'week' ? 'mt-1 text-[19px] sm:text-[23px]' : 'text-[14px] sm:text-[16px]'} font-head font-semibold tabular-nums`}>
+                    {day.date.getDate()}
+                  </span>
+                  <span className={`mt-1.5 h-1.5 w-1.5 rounded-full ${selected ? 'bg-white' : day.state === 'shift' ? 'bg-green' : 'bg-line'}`} />
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-[11px] font-medium text-muted">
           <span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-green" />{p.regular_shift}</span>
@@ -147,14 +243,36 @@ export default function PlatformShiftsPage() {
             {upcoming.map((shift, index) => (
               <PlatformCard key={shift.id} variant={index === 0 ? 'greenOutline' : 'surface'} className="p-4 sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <button type="button" onClick={() => setModal({ type: 'details', shift })} className="flex cursor-pointer items-center gap-3.5 rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green sm:w-[210px]">
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'details', shift })}
+                    className="flex cursor-pointer items-center gap-3.5 rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green sm:w-[210px]"
+                  >
                     <IconTile icon="calendar" tone={index === 0 ? 'green' : 'neutral'} />
-                    <span><span className="block text-[13px] font-bold text-text">{shift.date}</span><span className="mt-1 block text-[11px] text-muted">{user?.store?.name || 'Bahandi • Абая 21'}</span></span>
+                    <span>
+                      <span className="block text-[13px] font-bold text-text">{shift.date}</span>
+                      <span className="mt-1 block text-[11px] text-muted">{user?.store?.name || 'Bahandi • Абая 21'}</span>
+                    </span>
                   </button>
-                  <button type="button" onClick={() => setModal({ type: 'details', shift })} className="min-w-0 flex-1 cursor-pointer rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green sm:border-l sm:border-line sm:pl-5">
-                    <span className="block font-head text-[22px] font-semibold tabular-nums text-text">{shift.time}</span><span className="mt-1 block text-[12px] text-muted">{shift.role}</span>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'details', shift })}
+                    className="min-w-0 flex-1 cursor-pointer rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green sm:border-l sm:border-line sm:pl-5"
+                  >
+                    <span className="block font-head text-[22px] font-semibold tabular-nums text-text">{shift.time}</span>
+                    <span className="mt-1 block text-[12px] text-muted">{shift.role}</span>
                   </button>
-                  <div className="flex items-center justify-between gap-3 sm:justify-end"><StatusPill tone={shift.tone}>{shift.status}</StatusPill><button type="button" onClick={() => requestSwap(shift)} className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl border border-line text-muted transition-colors hover:border-orange hover:bg-orange-tint hover:text-orange active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green" aria-label={p.swap_shift}><Icon name="arrowSwap" size={19} /></button></div>
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <StatusPill tone={shift.tone}>{shift.status}</StatusPill>
+                    <button
+                      type="button"
+                      onClick={() => requestSwap(shift)}
+                      className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl border border-line text-muted transition-colors hover:border-orange hover:bg-orange-tint hover:text-orange active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
+                      aria-label={p.swap_shift}
+                    >
+                      <Icon name="arrowSwap" size={19} />
+                    </button>
+                  </div>
                 </div>
               </PlatformCard>
             ))}
@@ -164,25 +282,109 @@ export default function PlatformShiftsPage() {
         <aside>
           <SectionHeading title={p.open_shifts} />
           <PlatformCard className="overflow-hidden">
-            <div className="bg-orange p-5 text-white"><div className="text-[11px] font-bold uppercase tracking-[.12em] text-white/70">Пятница, 14 августа</div><div className="mt-2 font-head text-[29px] font-semibold tabular-nums">17:00–23:00</div><div className="mt-2 flex items-center gap-2 text-[12px] text-white/80"><Icon name="pin" size={16} />Bahandi • Достык</div></div>
-            <div className="p-5"><div className="flex items-center gap-3"><IconTile icon="users" tone="orange" size="sm" /><div><div className="text-[13px] font-semibold text-text">Нужен 1 сотрудник кухни</div><div className="mt-1 text-[11px] text-muted">6 часов • вечерняя смена</div></div></div><PlatformButton className="mt-5 w-full" icon="plus" onClick={() => setModal({ type: 'openShift' })}>{p.request_shift}</PlatformButton></div>
+            <div className="bg-orange p-5 text-white">
+              <div className="text-[11px] font-bold uppercase tracking-[.12em] text-white/70">{openShift.date}</div>
+              <div className="mt-2 font-head text-[29px] font-semibold tabular-nums">{openShift.time}</div>
+              <div className="mt-2 flex items-center gap-2 text-[12px] text-white/80">
+                <Icon name="pin" size={16} />{openShift.store}
+              </div>
+            </div>
+            <div className="p-5">
+              <div className="flex items-center gap-3">
+                <IconTile icon="users" tone="orange" size="sm" />
+                <div>
+                  <div className="text-[13px] font-semibold text-text">Нужен 1 сотрудник кухни</div>
+                  <div className="mt-1 text-[11px] text-muted">6 часов • вечерняя смена</div>
+                </div>
+              </div>
+              <PlatformButton className="mt-5 w-full" icon="plus" onClick={() => setModal({ type: 'openShift' })}>
+                {p.request_shift}
+              </PlatformButton>
+            </div>
           </PlatformCard>
-          <PlatformCard className="mt-4 p-5"><div className="flex items-start gap-3"><IconTile icon="helpCircle" tone="green" size="sm" /><div><div className="text-[13px] font-bold text-text">Нужен другой график?</div><p className="mb-0 mt-1 text-[12px] leading-relaxed text-muted">Создайте запрос менеджеру, если не можете выйти или хотите изменить время.</p></div></div><PlatformButton variant="secondary" className="mt-4 w-full" onClick={() => requestSwap(upcoming[0])}>{p.swap_shift}</PlatformButton></PlatformCard>
+          <PlatformCard className="mt-4 p-5">
+            <div className="flex items-start gap-3">
+              <IconTile icon="helpCircle" tone="green" size="sm" />
+              <div>
+                <div className="text-[13px] font-bold text-text">Нужен другой график?</div>
+                <p className="mb-0 mt-1 text-[12px] leading-relaxed text-muted">
+                  Создайте запрос менеджеру, если не можете выйти или хотите изменить время.
+                </p>
+              </div>
+            </div>
+            <PlatformButton variant="secondary" className="mt-4 w-full" onClick={() => requestSwap(upcoming[0])}>
+              {p.swap_shift}
+            </PlatformButton>
+          </PlatformCard>
         </aside>
       </div>
 
-      <PlatformModal open={modal?.type === 'details' || modal?.type === 'day'} onClose={() => setModal(null)} title="Детали смены" subtitle={modal?.shift?.date || 'Выбранный день'} footer={<><PlatformButton variant="secondary" onClick={() => setModal(null)}>Закрыть</PlatformButton><PlatformButton icon="arrowSwap" onClick={() => requestSwap(modal?.shift || upcoming[0])}>{p.swap_shift}</PlatformButton></>}>
-        <div className="rounded-2xl bg-green-tint p-4"><div className="font-head text-[27px] font-semibold tabular-nums text-green">{modal?.shift?.time || '09:00–18:00'}</div><div className="mt-1 text-[12px] text-green">Смена опубликована и подтверждена</div></div>
-        <div className="mt-4"><DetailRow icon="pin" label={p.store} value={user?.store?.name || 'Bahandi • Абая 21'} /><DetailRow icon="briefcase" label={p.role} value={p.role_value} /><DetailRow icon="coffee" label="Перерыв" value="45 минут" /></div>
+      <PlatformModal
+        open={modal?.type === 'details' || modal?.type === 'day'}
+        onClose={() => setModal(null)}
+        title="Детали смены"
+        subtitle={modal?.shift?.date || 'Выбранный день'}
+        footer={(
+          <>
+            <PlatformButton variant="secondary" onClick={() => setModal(null)}>Закрыть</PlatformButton>
+            <PlatformButton icon="arrowSwap" onClick={() => requestSwap(modal?.shift || upcoming[0])}>{p.swap_shift}</PlatformButton>
+          </>
+        )}
+      >
+        <div className="rounded-2xl bg-green-tint p-4">
+          <div className="font-head text-[27px] font-semibold tabular-nums text-green">{modal?.shift?.time || '09:00–18:00'}</div>
+          <div className="mt-1 text-[12px] text-green">Смена опубликована и подтверждена</div>
+        </div>
+        <div className="mt-4">
+          <DetailRow icon="pin" label={p.store} value={user?.store?.name || 'Bahandi • Абая 21'} />
+          <DetailRow icon="briefcase" label={p.role} value={p.role_value} />
+          <DetailRow icon="coffee" label="Перерыв" value="45 минут" />
+        </div>
       </PlatformModal>
 
-      <PlatformModal open={modal?.type === 'swap'} onClose={() => setModal(null)} title="Запросить изменение смены" subtitle={`${modal?.shift?.date || ''} • ${modal?.shift?.time || ''}`} footer={<><PlatformButton variant="secondary" onClick={() => setModal(null)}>Отмена</PlatformButton><PlatformButton icon="send" onClick={confirmSwap}>Отправить менеджеру</PlatformButton></>}>
-        <PlatformField as="textarea" label="Причина или комментарий" rows={4} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Например: могу выйти после 12:00 или обменяться с коллегой…" hint="Менеджер увидит запрос и предложит доступные варианты." />
+      <PlatformModal
+        open={modal?.type === 'swap'}
+        onClose={() => setModal(null)}
+        title="Запросить изменение смены"
+        subtitle={`${modal?.shift?.date || ''} • ${modal?.shift?.time || ''}`}
+        footer={(
+          <>
+            <PlatformButton variant="secondary" onClick={() => setModal(null)}>Отмена</PlatformButton>
+            <PlatformButton icon="send" onClick={confirmSwap}>Отправить менеджеру</PlatformButton>
+          </>
+        )}
+      >
+        <PlatformField
+          as="textarea"
+          label="Причина или комментарий"
+          rows={4}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          placeholder="Например: могу выйти после 12:00 или обменяться с коллегой…"
+          hint="Менеджер увидит запрос и предложит доступные варианты."
+        />
       </PlatformModal>
 
-      <PlatformModal open={modal?.type === 'openShift'} onClose={() => setModal(null)} title="Подтвердить запрос" subtitle="Пятница, 14 августа • 17:00–23:00" footer={<><PlatformButton variant="secondary" onClick={() => setModal(null)}>Отмена</PlatformButton><PlatformButton icon="check" onClick={confirmOpenShift}>Запросить смену</PlatformButton></>}>
-        <div className="rounded-2xl bg-orange-tint p-4 text-[13px] leading-relaxed text-muted">После отправки менеджер проверит график. Смена появится в календаре только после подтверждения.</div>
-        <div className="mt-4"><DetailRow icon="pin" label={p.store} value="Bahandi • Достык" /><DetailRow icon="clock" label="Продолжительность" value="6 часов" /><DetailRow icon="wallet" label="Ориентировочный доход" value="8 400 ₸" /></div>
+      <PlatformModal
+        open={modal?.type === 'openShift'}
+        onClose={() => setModal(null)}
+        title="Подтвердить запрос"
+        subtitle={`${openShift.date} • ${openShift.time}`}
+        footer={(
+          <>
+            <PlatformButton variant="secondary" onClick={() => setModal(null)}>Отмена</PlatformButton>
+            <PlatformButton icon="check" onClick={confirmOpenShift}>Запросить смену</PlatformButton>
+          </>
+        )}
+      >
+        <div className="rounded-2xl bg-orange-tint p-4 text-[13px] leading-relaxed text-muted">
+          После отправки менеджер проверит график. Смена появится в календаре только после подтверждения.
+        </div>
+        <div className="mt-4">
+          <DetailRow icon="pin" label={p.store} value={openShift.store} />
+          <DetailRow icon="clock" label="Продолжительность" value={openShift.duration} />
+          <DetailRow icon="wallet" label="Ориентировочный доход" value={openShift.income} />
+        </div>
       </PlatformModal>
     </div>
   );

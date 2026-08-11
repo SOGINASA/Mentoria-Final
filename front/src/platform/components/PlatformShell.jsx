@@ -7,17 +7,21 @@ import { useAuthStore } from '../../store/authStore';
 import { useNotifyStore } from '../../store/notifyStore';
 import { initials } from '../../utils/format';
 import { HOME_ROUTE_BY_ROLE } from '../../constants/roles';
+import { usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
+import {
+  createPlatformNavigation,
+  getPlatformRouteTitle,
+  PLATFORM_ROUTES,
+  SECONDARY_PLATFORM_ROUTES,
+} from '../platformConfig';
 
 function usePlatformNav() {
   const { p } = usePlatformCopy();
-  return [
-    { to: '/app', end: true, icon: 'home', label: p.today },
-    { to: '/app/shifts', icon: 'calendar', label: p.shifts },
-    { to: '/app/income', icon: 'wallet', label: p.income },
-    { to: '/app/tasks', icon: 'clipboard', label: p.tasks, badge: 3 },
-    { to: '/app/profile', icon: 'user', label: p.profile },
-  ];
+  const pendingTaskCount = usePlatformStore((state) => (
+    state.tasks.filter((task) => !task.done).length
+  ));
+  return createPlatformNavigation(p, pendingTaskCount);
 }
 
 function PlatformSidebar() {
@@ -30,7 +34,7 @@ function PlatformSidebar() {
     <aside className="hidden h-[100dvh] w-[272px] flex-none flex-col self-start overflow-y-auto overscroll-contain border-r border-line bg-surface px-4 py-5 lg:sticky lg:top-0 lg:flex">
       <button
         type="button"
-        onClick={() => navigate('/app')}
+        onClick={() => navigate(PLATFORM_ROUTES.home)}
         className="self-start rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
         aria-label={p.today}
       >
@@ -50,7 +54,7 @@ function PlatformSidebar() {
             to={item.to}
             end={item.end}
             className={({ isActive }) => `group relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[14px] font-semibold transition-[color,background-color,box-shadow,transform] duration-200 active:scale-[.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${
-              isActive ? 'bg-green text-white shadow-card-sm' : 'text-muted hover:bg-surface2 hover:text-text'
+              isActive ? 'bg-brand text-on-brand shadow-card-sm' : 'text-muted hover:bg-surface2 hover:text-text'
             }`}
           >
             {({ isActive }) => (
@@ -78,10 +82,10 @@ function PlatformSidebar() {
         <span>{p.old_system}</span>
       </button>
       <NavLink
-        to="/app/profile"
+        to={PLATFORM_ROUTES.profile}
         className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 transition-colors hover:bg-surface2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
       >
-        <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-green font-head text-[15px] font-semibold text-white">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand font-head text-[15px] font-semibold text-on-brand">
           {initials(user?.full_name)}
         </span>
         <span className="min-w-0 flex-1">
@@ -100,21 +104,14 @@ function PlatformHeader() {
   const user = useAuthStore((s) => s.user);
   const unread = useNotifyStore((s) => s.unread);
   const { p } = usePlatformCopy();
-  const secondary = ['/app/notifications', '/app/support', '/app/news'].includes(pathname);
-  const title = pathname === '/app/shifts' ? p.shifts
-    : pathname === '/app/income' ? p.income
-      : pathname === '/app/tasks' ? p.tasks
-        : pathname === '/app/profile' ? p.profile
-          : pathname === '/app/notifications' ? p.notifications
-            : pathname === '/app/support' ? p.support
-              : pathname === '/app/news' ? p.news
-          : p.today;
+  const secondary = SECONDARY_PLATFORM_ROUTES.has(pathname);
+  const title = getPlatformRouteTitle(pathname, p);
 
   return (
     <header className="sticky top-0 z-20 flex h-16 flex-none items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur-md sm:px-6 lg:px-8">
       <button
         type="button"
-        onClick={() => secondary ? navigate(-1) : navigate('/app')}
+        onClick={() => secondary ? navigate(-1) : navigate(PLATFORM_ROUTES.home)}
         className="grid h-11 min-w-11 cursor-pointer place-items-center rounded-xl lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
         aria-label={secondary ? p.back : p.today}
       >
@@ -126,7 +123,7 @@ function PlatformHeader() {
       </div>
       <button
         type="button"
-        onClick={() => navigate('/app/notifications')}
+        onClick={() => navigate(PLATFORM_ROUTES.notifications)}
         className="relative grid h-11 w-11 place-items-center rounded-2xl border border-line bg-surface text-text transition-colors hover:bg-surface2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
         aria-label={p.notifications}
       >
@@ -139,8 +136,8 @@ function PlatformHeader() {
       </button>
       <button
         type="button"
-        onClick={() => navigate('/app/profile')}
-        className="grid h-11 w-11 place-items-center rounded-full bg-green font-head text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+        onClick={() => navigate(PLATFORM_ROUTES.profile)}
+        className="grid h-11 w-11 place-items-center rounded-full bg-brand font-head text-[15px] font-semibold text-on-brand transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
         aria-label={p.profile}
       >
         {initials(user?.full_name)}
@@ -200,7 +197,7 @@ export default function PlatformShell() {
 
   return (
     <div className="flex min-h-[100dvh] bg-bg text-text">
-      <a href="#platform-main" className="fixed left-3 top-3 z-[100] -translate-y-20 rounded-xl bg-green px-4 py-3 text-sm font-bold text-white transition-transform focus:translate-y-0">К содержимому</a>
+      <a href="#platform-main" className="fixed left-3 top-3 z-[100] -translate-y-20 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-on-brand transition-transform focus:translate-y-0">К содержимому</a>
       <PlatformSidebar />
       <div className="min-w-0 flex-1">
         <PlatformHeader />

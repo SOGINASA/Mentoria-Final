@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
 import { usePlatformCopy } from '../platformCopy';
 import PlatformModal from '../components/PlatformModal';
+import { INCOME_BREAKDOWN } from '../platformData';
+import { PLATFORM_ROUTES } from '../platformConfig';
 import {
   DetailRow,
   IconTile,
@@ -14,17 +16,16 @@ import {
   StatusPill,
 } from '../components/PlatformUi';
 
-const rows = [
-  { key: 'base_pay', meta: '128 ч × ставка', amount: '143 200 ₸', tone: 'green', icon: 'clock' },
-  { key: 'evening_pay', meta: '16 подтверждённых часов', amount: '+9 600 ₸', tone: 'orange', icon: 'moon' },
-  { key: 'bonus_pay', meta: 'Качество и выполнение плана', amount: '+8 900 ₸', tone: 'amber', icon: 'checkCircle' },
-  { key: 'waiting_pay', meta: '16 часов в табеле', amount: '+24 700 ₸', tone: 'neutral', icon: 'history' },
-];
-
 export default function PlatformIncomePage() {
   const navigate = useNavigate();
-  const { p } = usePlatformCopy();
+  const { p, lang } = usePlatformCopy();
   const [selectedRow, setSelectedRow] = useState(null);
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthName = new Intl.DateTimeFormat(lang === 'kz' ? 'kk-KZ' : 'ru-RU', {
+    month: 'long',
+  }).format(now);
+  const calculationPeriod = `1–${lastDay} ${monthName}`;
 
   return (
     <div className="mx-auto w-full max-w-[1380px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
@@ -79,7 +80,7 @@ export default function PlatformIncomePage() {
         <section>
           <SectionHeading title={p.calculation} />
           <PlatformCard className="overflow-hidden">
-            {rows.map((row, index) => (
+            {INCOME_BREAKDOWN.map((row, index) => (
               <button
                 key={row.key}
                 type="button"
@@ -124,18 +125,18 @@ export default function PlatformIncomePage() {
                 <p className="mb-0 mt-1 text-[12px] leading-relaxed text-muted">{p.payslip_sub}</p>
               </div>
             </div>
-            <PlatformButton variant="secondary" className="mt-4 w-full" icon="helpCircle" onClick={() => navigate('/app/support')}>{p.ask_income}</PlatformButton>
+            <PlatformButton variant="secondary" className="mt-4 w-full" icon="helpCircle" onClick={() => navigate(PLATFORM_ROUTES.support)}>{p.ask_income}</PlatformButton>
           </PlatformCard>
         </aside>
       </div>
 
-      <PlatformModal open={Boolean(selectedRow)} onClose={() => setSelectedRow(null)} title={selectedRow ? p[selectedRow.key] : ''} subtitle="Детализация предварительного расчёта" footer={<><PlatformButton variant="secondary" onClick={() => setSelectedRow(null)}>Закрыть</PlatformButton><PlatformButton icon="helpCircle" onClick={() => navigate('/app/support')}>{p.ask_income}</PlatformButton></>}>
+      <PlatformModal open={Boolean(selectedRow)} onClose={() => setSelectedRow(null)} title={selectedRow ? p[selectedRow.key] : ''} subtitle="Детализация предварительного расчёта" footer={<><PlatformButton variant="secondary" onClick={() => setSelectedRow(null)}>Закрыть</PlatformButton><PlatformButton icon="helpCircle" onClick={() => navigate(PLATFORM_ROUTES.support)}>{p.ask_income}</PlatformButton></>}>
         <div className="rounded-2xl bg-green-tint p-5">
           <div className="text-[11px] font-bold uppercase tracking-[.1em] text-green">Сумма начисления</div>
           <div className="mt-2 font-head text-[34px] font-semibold tabular-nums text-green">{selectedRow?.amount}</div>
         </div>
         <div className="mt-4">
-          <DetailRow icon="calendar" label="Расчётный период" value="1–31 августа" />
+          <DetailRow icon="calendar" label="Расчётный период" value={calculationPeriod} />
           <DetailRow icon="clock" label="Основание" value={selectedRow?.meta} />
           <DetailRow icon="checkCircle" label="Статус" value={selectedRow?.key === 'waiting_pay' ? 'Ожидает проверки' : 'Подтверждено'} />
           <DetailRow icon="info" label="Обновлено" value="Сегодня, 08:30" />

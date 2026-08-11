@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
+import { usePlatformStore } from '../../store/platformStore';
 import { HOME_ROUTE_BY_ROLE } from '../../constants/roles';
 import { initials } from '../../utils/format';
 import { usePlatformCopy } from '../platformCopy';
@@ -48,8 +49,12 @@ export default function PlatformProfilePage() {
   const { theme, toggleTheme, lang, setLang, showToast } = useUiStore();
   const { p } = usePlatformCopy();
   const [panel, setPanel] = useState(null);
-  const [phone, setPhone] = useState('+7 707 000 24 10');
-  const [email, setEmail] = useState('employee@bahandi.kz');
+  const contactDetails = usePlatformStore((state) => state.contactDetails);
+  const updateContactDetails = usePlatformStore((state) => state.updateContactDetails);
+  const createSupportTicket = usePlatformStore((state) => state.createSupportTicket);
+  const [contactDraft, setContactDraft] = useState(contactDetails);
+  const [contactErrors, setContactErrors] = useState({});
+  const currentYear = new Date().getFullYear();
 
   const hrItems = [
     { id: 'documents', icon: 'clipboard', tone: 'green', title: p.documents, subtitle: 'Договоры, справки и расчётные документы' },
@@ -69,8 +74,26 @@ export default function PlatformProfilePage() {
   }
 
   function saveProfile() {
+    const errors = {};
+    if (contactDraft.phone.replace(/\D/g, '').length < 11) errors.phone = 'Проверьте номер телефона';
+    if (!/^\S+@\S+\.\S+$/.test(contactDraft.email)) errors.email = 'Введите корректный email';
+    setContactErrors(errors);
+    if (Object.keys(errors).length) return;
+
+    updateContactDetails({
+      phone: contactDraft.phone.trim(),
+      email: contactDraft.email.trim(),
+    });
     setPanel(null);
     showToast('Контактные данные сохранены');
+  }
+
+  function requestDocument(title) {
+    const ticket = createSupportTicket({
+      category: 'hr',
+      message: `Запрос документа: ${title}`,
+    });
+    showToast(`Запрос ${ticket.id} создан`);
   }
 
   return (
@@ -80,7 +103,7 @@ export default function PlatformProfilePage() {
       <PlatformCard className="relative mt-6 overflow-hidden p-5 sm:p-7">
         <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-green-tint" />
         <div className="relative z-[1] flex flex-col gap-5 sm:flex-row sm:items-center">
-          <div className="grid h-[88px] w-[88px] flex-none place-items-center rounded-[28px] bg-green font-head text-[31px] font-semibold text-white shadow-card">
+          <div className="grid h-[88px] w-[88px] flex-none place-items-center rounded-[28px] bg-brand font-head text-[31px] font-semibold text-on-brand shadow-card">
             {initials(user?.full_name)}
           </div>
           <div className="min-w-0 flex-1">
@@ -90,7 +113,7 @@ export default function PlatformProfilePage() {
               {user?.store?.name && <span className="rounded-full bg-surface2 px-3 py-1.5 text-[11px] font-bold text-muted">{user.store.name}</span>}
             </div>
           </div>
-          <button type="button" onClick={() => setPanel('edit')} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-line bg-surface px-4 text-[13px] font-bold text-text transition-colors hover:bg-surface2 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
+          <button type="button" onClick={() => { setContactDraft(contactDetails); setContactErrors({}); setPanel('edit'); }} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-line bg-surface px-4 text-[13px] font-bold text-text transition-colors hover:bg-surface2 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
             <Icon name="edit" size={18} />
             Редактировать
           </button>
@@ -133,7 +156,7 @@ export default function PlatformProfilePage() {
                     type="button"
                     onClick={() => setLang(value)}
                     aria-pressed={lang === value}
-                    className={`min-h-9 rounded-lg px-3 text-[11px] font-bold uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${lang === value ? 'bg-green text-white' : 'text-muted hover:bg-surface'}`}
+                    className={`min-h-9 rounded-lg px-3 text-[11px] font-bold uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${lang === value ? 'bg-brand text-on-brand' : 'text-muted hover:bg-surface'}`}
                   >
                     {value}
                   </button>
@@ -167,8 +190,8 @@ export default function PlatformProfilePage() {
 
       <PlatformModal open={panel === 'edit'} onClose={() => setPanel(null)} title="Контактные данные" subtitle="Основные данные сотрудника меняются только через HR" footer={<><PlatformButton variant="secondary" onClick={() => setPanel(null)}>Отмена</PlatformButton><PlatformButton icon="check" onClick={saveProfile}>Сохранить</PlatformButton></>}>
         <div className="space-y-4">
-          <PlatformField label="Телефон" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" />
-          <PlatformField label="Рабочая почта" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" />
+          <PlatformField label="Телефон" type="tel" value={contactDraft.phone} error={contactErrors.phone} onChange={(event) => { setContactDraft((draft) => ({ ...draft, phone: event.target.value })); setContactErrors((errors) => ({ ...errors, phone: null })); }} autoComplete="tel" />
+          <PlatformField label="Рабочая почта" type="email" value={contactDraft.email} error={contactErrors.email} onChange={(event) => { setContactDraft((draft) => ({ ...draft, email: event.target.value })); setContactErrors((errors) => ({ ...errors, email: null })); }} autoComplete="email" />
         </div>
         <div className="mt-4 rounded-2xl bg-surface2 p-4 text-[12px] leading-relaxed text-muted">ФИО, должность и торговая точка синхронизируются с кадровой системой.</div>
       </PlatformModal>
@@ -177,20 +200,20 @@ export default function PlatformProfilePage() {
         <div className="space-y-2">
           {[
             ['Трудовой договор', 'PDF • обновлён 12.06.2025'],
-            ['Расчётный лист • июль 2026', 'PDF • 184 КБ'],
-            ['Справка с места работы', 'PDF • сформирована 08.08.2026'],
+            [`Расчётный лист • ${currentYear}`, 'PDF • 184 КБ'],
+            ['Справка с места работы', 'Формируется по запросу'],
           ].map(([title, meta]) => (
             <div key={title} className="flex min-h-[72px] items-center gap-3 rounded-2xl border border-line p-3.5">
               <IconTile icon="fileText" tone="green" size="sm" />
               <div className="min-w-0 flex-1"><div className="text-[13px] font-bold text-text">{title}</div><div className="mt-1 text-[11px] text-muted">{meta}</div></div>
-              <button type="button" onClick={() => showToast('Документ подготовлен к скачиванию')} className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl bg-surface2 text-green hover:bg-green-tint active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green" aria-label={`Скачать ${title}`}><Icon name="download" size={19} /></button>
+              <button type="button" onClick={() => requestDocument(title)} className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl bg-surface2 text-green hover:bg-green-tint active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green" aria-label={`Запросить ${title}`}><Icon name="send" size={19} /></button>
             </div>
           ))}
         </div>
       </PlatformModal>
 
       <PlatformModal open={panel === 'vacation'} onClose={() => setPanel(null)} title={p.vacation} subtitle="Баланс и ближайшие заявки" footer={<><PlatformButton variant="secondary" onClick={() => setPanel(null)}>Закрыть</PlatformButton><PlatformButton icon="plus" onClick={() => { setPanel(null); showToast('Черновик заявки создан'); }}>Новая заявка</PlatformButton></>}>
-        <div className="rounded-2xl bg-orange-tint p-5"><div className="text-[11px] font-bold uppercase tracking-[.1em] text-orange">Доступно</div><div className="mt-2 font-head text-[36px] font-semibold text-orange">12 дней</div><div className="mt-1 text-[12px] text-muted">из 24 дней в 2026 году</div></div>
+        <div className="rounded-2xl bg-orange-tint p-5"><div className="text-[11px] font-bold uppercase tracking-[.1em] text-orange">Доступно</div><div className="mt-2 font-head text-[36px] font-semibold text-orange">12 дней</div><div className="mt-1 text-[12px] text-muted">из 24 дней в {currentYear} году</div></div>
         <div className="mt-5"><DetailRow icon="calendar" label="Запланировано" value="2–8 сентября" /><DetailRow icon="checkCircle" label="Статус заявки" value="Согласовано" /><DetailRow icon="clock" label="Следующее начисление" value="1 сентября" /></div>
       </PlatformModal>
 

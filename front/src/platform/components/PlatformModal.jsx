@@ -1,9 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../../components/ui/Icon';
 
 export default function PlatformModal({ open, onClose, title, subtitle, children, footer, size = 'md' }) {
   const panelRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -12,13 +19,13 @@ export default function PlatformModal({ open, onClose, title, subtitle, children
     document.body.style.overflow = 'hidden';
 
     const timer = window.setTimeout(() => {
-      panelRef.current?.querySelector('button, input, textarea, select, [tabindex]:not([tabindex="-1"])')?.focus();
+      panelRef.current?.querySelector('button, a[href], input, textarea, select, [tabindex]:not([tabindex="-1"])')?.focus();
     }, 20);
 
     function onKeyDown(event) {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current?.();
       if (event.key !== 'Tab' || !panelRef.current) return;
-      const focusable = [...panelRef.current.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')];
+      const focusable = [...panelRef.current.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')];
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -38,7 +45,7 @@ export default function PlatformModal({ open, onClose, title, subtitle, children
       document.removeEventListener('keydown', onKeyDown);
       previousActive?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -55,14 +62,15 @@ export default function PlatformModal({ open, onClose, title, subtitle, children
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="platform-dialog-title"
+        aria-labelledby={titleId}
+        aria-describedby={subtitle ? descriptionId : undefined}
         className={`relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[28px] border border-line bg-surface shadow-card animate-slideUp sm:rounded-[28px] sm:animate-fadeUp ${widths[size] || widths.md}`}
       >
         <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-line sm:hidden" />
         <header className="flex items-start gap-4 border-b border-line2 px-5 py-4 sm:px-6 sm:py-5">
           <div className="min-w-0 flex-1">
-            <h2 id="platform-dialog-title" className="m-0 font-head text-[22px] font-semibold leading-tight text-text sm:text-[25px]">{title}</h2>
-            {subtitle && <p className="mb-0 mt-1.5 text-[12px] leading-relaxed text-muted sm:text-[13px]">{subtitle}</p>}
+            <h2 id={titleId} className="m-0 font-head text-[22px] font-semibold leading-tight text-text sm:text-[25px]">{title}</h2>
+            {subtitle && <p id={descriptionId} className="mb-0 mt-1.5 text-[12px] leading-relaxed text-muted sm:text-[13px]">{subtitle}</p>}
           </div>
           <button
             type="button"

@@ -18,6 +18,9 @@
   --green: #0a6730;
   --green-d: #085026;
   --green-tint: #e6f0e9;
+  --brand-surface: #0a6730;
+  --brand-surface-hover: #085026;
+  --on-brand: #ffffff;
   --orange: #ea5e1f;
   --orange-tint: #fceee5;
   --ink: #2b2a28;
@@ -47,6 +50,9 @@
   --green: #46b06f;
   --green-d: #3a9c60;
   --green-tint: #15281b;
+  --brand-surface: #205f39;
+  --brand-surface-hover: #2a7147;
+  --on-brand: #ffffff;
   --orange: #f47a3f;
   --orange-tint: #2c1c12;
   --ink: #0a0d08;

@@ -10,6 +10,7 @@ export const useNotifyStore = create((set, get) => ({
   items: [],
   unread: 0,
   loading: false,
+  error: null,
   pagination: null,
 
   // Лёгкий запрос для бейджа (используется в polling).
@@ -24,7 +25,7 @@ export const useNotifyStore = create((set, get) => ({
 
   // Полный список (для экрана уведомлений).
   async fetchList(params = {}) {
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const data = await notifyApi.listNotifications(params);
       set({
@@ -33,8 +34,11 @@ export const useNotifyStore = create((set, get) => ({
         pagination: data.pagination || null,
         loading: false,
       });
-    } catch {
-      set({ loading: false });
+    } catch (error) {
+      set({
+        loading: false,
+        error: error?.message || 'Не удалось загрузить уведомления',
+      });
     }
   },
 

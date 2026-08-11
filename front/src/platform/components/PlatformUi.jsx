@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import Icon from '../../components/ui/Icon';
 
 export function PageIntro({ eyebrow, title, subtitle, action }) {
@@ -51,7 +52,7 @@ export function StatusPill({ children, tone = 'green' }) {
 export function PlatformCard({ children, className = '', as: Component = 'div', variant = 'surface', ...props }) {
   const variants = {
     surface: 'border-line bg-surface',
-    brand: 'border-transparent bg-green text-white',
+    brand: 'border-transparent bg-brand text-on-brand',
     orangeTint: 'border-orange bg-orange-tint',
     greenOutline: 'border-green bg-surface',
   };
@@ -62,9 +63,9 @@ export function PlatformCard({ children, className = '', as: Component = 'div', 
   );
 }
 
-export function PlatformButton({ children, variant = 'primary', icon, className = '', ...props }) {
+export function PlatformButton({ children, variant = 'primary', icon, loading = false, className = '', disabled, ...props }) {
   const variants = {
-    primary: 'border-green bg-green text-white hover:bg-green-d',
+    primary: 'border-brand bg-brand text-on-brand hover:bg-brand-hover',
     secondary: 'border-line bg-surface text-text hover:bg-surface2',
     soft: 'border-transparent bg-green-tint text-green hover:brightness-95',
     danger: 'border-red bg-red-tint text-red hover:brightness-95',
@@ -72,27 +73,32 @@ export function PlatformButton({ children, variant = 'primary', icon, className 
   return (
     <button
       type="button"
+      disabled={disabled || loading}
       className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border px-4 text-[13px] font-bold transition-[color,background-color,border-color,transform] active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${variants[variant] || variants.primary} ${className}`}
       {...props}
     >
-      {icon && <Icon name={icon} size={18} strokeWidth={2.2} />}
+      {loading ? <Icon name="refresh" size={18} className="animate-spin" /> : icon && <Icon name={icon} size={18} strokeWidth={2.2} />}
       {children}
     </button>
   );
 }
 
 export function PlatformField({ label, hint, error, as: Component = 'input', className = '', ...props }) {
-  const id = props.id || `field-${String(label).toLowerCase().replace(/\s+/g, '-')}`;
+  const generatedId = useId();
+  const id = props.id || generatedId;
+  const messageId = `${id}-message`;
   return (
-    <label htmlFor={id} className="block">
-      <span className="mb-2 block text-[12px] font-bold text-text">{label}</span>
+    <div className="block">
+      <label htmlFor={id} className="mb-2 block text-[12px] font-bold text-text">{label}</label>
       <Component
         id={id}
+        aria-invalid={Boolean(error)}
+        aria-describedby={(error || hint) ? messageId : undefined}
         className={`min-h-12 w-full rounded-2xl border border-line bg-surface2 px-4 py-3 text-[14px] leading-relaxed text-text outline-none transition-colors placeholder:text-faint focus:border-green focus:ring-2 focus:ring-green/20 ${error ? 'border-red' : ''} ${className}`}
         {...props}
       />
-      {(error || hint) && <span className={`mt-1.5 block text-[11px] ${error ? 'text-red' : 'text-muted'}`}>{error || hint}</span>}
-    </label>
+      {(error || hint) && <span id={messageId} role={error ? 'alert' : undefined} className={`mt-1.5 block text-[11px] ${error ? 'text-red' : 'text-muted'}`}>{error || hint}</span>}
+    </div>
   );
 }
 

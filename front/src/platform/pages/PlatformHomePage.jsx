@@ -1,9 +1,10 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
+import { taskProgress, usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
+import { PLATFORM_ROUTES } from '../platformConfig';
 import {
   IconTile,
   PageIntro,
@@ -30,27 +31,25 @@ export default function PlatformHomePage() {
   const { p, lang } = usePlatformCopy();
   const user = useAuthStore((s) => s.user);
   const showToast = useUiStore((s) => s.showToast);
-  const [shiftActive, setShiftActive] = useState(false);
+  const shiftActive = usePlatformStore((state) => state.shiftActive);
+  const setShiftActive = usePlatformStore((state) => state.setShiftActive);
+  const tasks = usePlatformStore((state) => state.tasks);
 
   const date = new Intl.DateTimeFormat(lang === 'kz' ? 'kk-KZ' : 'ru-RU', {
     weekday: 'long', day: 'numeric', month: 'long',
   }).format(new Date());
 
-  const priorityTasks = [
-    { id: 1, title: p.task_opening, subtitle: p.task_opening_sub, icon: 'clipboard', tone: 'green', time: '09:15' },
-    { id: 2, title: p.task_temp, subtitle: p.task_temp_sub, icon: 'clock', tone: 'orange', time: '10:00' },
-    { id: 3, title: p.task_learn, subtitle: p.task_learn_sub, icon: 'book', tone: 'amber', time: '4 мин' },
-  ];
+  const priorityTasks = tasks.filter((task) => !task.done).slice(0, 3);
 
   const quickActions = [
-    { title: p.open_schedule, icon: 'calendar', tone: 'green', to: '/app/shifts' },
-    { title: p.swap_shift, icon: 'arrowSwap', tone: 'orange', to: '/app/shifts' },
+    { title: p.open_schedule, icon: 'calendar', tone: 'green', to: PLATFORM_ROUTES.shifts },
+    { title: p.swap_shift, icon: 'arrowSwap', tone: 'orange', to: PLATFORM_ROUTES.shifts },
     { title: p.writeoff, icon: 'camera', tone: 'amber', to: '/create' },
-    { title: p.ask_help, icon: 'helpCircle', tone: 'green', to: '/app/support' },
+    { title: p.ask_help, icon: 'helpCircle', tone: 'green', to: PLATFORM_ROUTES.support },
   ];
 
   function toggleShift() {
-    setShiftActive((active) => !active);
+    setShiftActive(!shiftActive);
     showToast(shiftActive ? p.end_shift : p.shift_started);
   }
 
@@ -125,7 +124,7 @@ export default function PlatformHomePage() {
           </div>
           <div className="mt-4 flex items-center justify-between rounded-2xl bg-surface2 px-3.5 py-3 text-[12px]">
             <span className="text-muted">128 / 176 ч</span>
-            <button onClick={() => navigate('/app/income')} className="min-h-8 rounded-lg px-2 font-bold text-green hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
+            <button type="button" onClick={() => navigate(PLATFORM_ROUTES.income)} className="min-h-8 rounded-lg px-2 font-bold text-green hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
               {p.income} <span aria-hidden="true">→</span>
             </button>
           </div>
@@ -153,22 +152,22 @@ export default function PlatformHomePage() {
         <section aria-labelledby="priority-title">
           <SectionHeading
             title={p.priority}
-            action={<PlatformButton variant="soft" onClick={() => navigate('/app/tasks')}>{p.see_all}</PlatformButton>}
+            action={<PlatformButton variant="soft" onClick={() => navigate(PLATFORM_ROUTES.tasks)}>{p.see_all}</PlatformButton>}
           />
           <PlatformCard className="overflow-hidden">
             {priorityTasks.map((task, index) => (
               <button
                 key={task.id}
                 type="button"
-                onClick={() => navigate('/app/tasks')}
+                onClick={() => navigate(PLATFORM_ROUTES.tasks)}
                 className={`flex min-h-[78px] w-full items-center gap-3.5 bg-transparent p-4 text-left transition-colors hover:bg-surface2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-green sm:px-5 ${index ? 'border-t border-line2' : ''}`}
               >
                 <IconTile icon={task.icon} tone={task.tone} size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-semibold text-text">{task.title}</span>
-                  <span className="mt-1 block text-[12px] text-muted">{task.subtitle}</span>
+                  <span className="block text-[14px] font-semibold text-text">{task.title || p[task.titleKey]}</span>
+                  <span className="mt-1 block text-[12px] text-muted">{task.subtitle || p[task.subKey]}</span>
                 </span>
-                <span className="hidden text-[11px] font-semibold tabular-nums text-faint sm:block">{task.time}</span>
+                <span className="hidden text-[11px] font-semibold tabular-nums text-faint sm:block">{taskProgress(task) != null ? `${taskProgress(task)}%` : task.due}</span>
                 <Icon name="chevronRight" size={17} className="text-faint" />
               </button>
             ))}
@@ -184,7 +183,7 @@ export default function PlatformHomePage() {
             </div>
             <h4 className="mb-2 mt-5 font-head text-[19px] font-semibold leading-snug text-text">{p.news_title}</h4>
             <p className="m-0 text-[13px] leading-relaxed text-muted">{p.news_sub}</p>
-            <button type="button" onClick={() => navigate('/app/news')} className="mt-4 min-h-9 rounded-xl px-2 text-[12px] font-bold text-green hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
+            <button type="button" onClick={() => navigate(PLATFORM_ROUTES.news)} className="mt-4 min-h-9 rounded-xl px-2 text-[12px] font-bold text-green hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
               {p.see_all} <span aria-hidden="true">→</span>
             </button>
           </PlatformCard>
