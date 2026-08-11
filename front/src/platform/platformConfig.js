@@ -53,11 +53,11 @@ export function getPlatformBackRoute(pathname) {
   return PLATFORM_ROUTES.home;
 }
 
-export function createPlatformNavigation(copy, pendingTaskCount = 0, flags = {}) {
+export function createPlatformNavigation(copy, pendingTaskCount = 0) {
   return [
     { to: PLATFORM_ROUTES.home, end: true, icon: 'home', label: copy.today },
     { to: PLATFORM_ROUTES.shifts, icon: 'calendar', label: copy.shifts },
-    ...(flags.income === false ? [] : [{ to: PLATFORM_ROUTES.income, icon: 'wallet', label: copy.income }]),
+    { to: PLATFORM_ROUTES.income, icon: 'wallet', label: copy.income },
     {
       to: PLATFORM_ROUTES.tasks,
       icon: 'clipboard',
@@ -111,6 +111,21 @@ export function getPlatformRouteTitle(pathname, copy) {
 
   const parentRoute = Object.keys(titles).find((route) => pathname.startsWith(`${route}/`));
   return titles[parentRoute] || copy.platform;
+}
+
+export function getPlatformCompactRouteTitle(pathname, copy) {
+  const titles = {
+    [PLATFORM_ROUTES.services]: copy.services_short,
+    [PLATFORM_ROUTES.learning]: copy.learning,
+    [PLATFORM_ROUTES.documents]: copy.documents_short,
+    [PLATFORM_ROUTES.leave]: copy.vacation_short,
+    [PLATFORM_ROUTES.support]: copy.support_short,
+  };
+  const exactTitle = titles[pathname];
+  if (exactTitle) return exactTitle;
+
+  const parentRoute = Object.keys(titles).find((route) => pathname.startsWith(`${route}/`));
+  return titles[parentRoute] || getPlatformRouteTitle(pathname, copy);
 }
 
 export { SECONDARY_PLATFORM_ROUTES };
