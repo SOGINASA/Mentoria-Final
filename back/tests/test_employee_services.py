@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import pytest
 
 from constants import ROLE_MANAGER, ROLE_SENDER
-from models import Notification, User, db
+from models import Notification, Store, User, db
 from platform_models import AuditEvent, EmployeeDocumentRequest, LeaveRequest
 
 
@@ -166,3 +166,72 @@ def test_leave_request_state_machine_balance_and_audit(client, sender, manager, 
     assert cancelled.status_code == 200
     assert cancelled.get_json()['request']['status'] == 'cancelled'
     assert LeaveRequest.query.filter_by(status='cancelled').count() == 1
+
+
+def test_leave_approval_rechecks_balance_after_another_request_is_approved(
+        client, sender, manager, auth):
+    first_start, first_end = future_range(offset=30, days=20)
+    second_start, second_end = future_range(offset=60, days=10)
+    first = client.post('/api/employee-services/leave/requests', headers=auth(sender), json={
+        'leave_type': 'annual', 'starts_on': first_start, 'ends_on': first_end,
+    }).get_json()['request']
+    second = client.post('/api/employee-services/leave/requests', headers=auth(sender), json={
+        'leave_type': 'annual', 'starts_on': second_start, 'ends_on': second_end,
+    }).get_json()['request']
+
+    approved = client.post(
+        f"/api/employee-services/manager/leave/requests/{first['request_id']}/decision",
+        headers=auth(manager), json={'decision': 'approved', 'version': first['version']},
+    )
+    assert approved.status_code == 200
+    assert approved.get_json()['leave_balance']['available_days'] == 4
+
+    over_limit = client.post(
+        f"/api/employee-services/manager/leave/requests/{second['request_id']}/decision",
+        headers=auth(manager), json={'decision': 'approved', 'version': second['version']},
+    )
+    assert over_limit.status_code == 409
+    assert over_limit.get_json()['leave_balance']['available_days'] == 4
+    assert db.session.get(LeaveRequest, second['request_id']).status == 'pending'
+
+
+def test_manager_today_includes_only_scoped_employee_service_requests(
+        client, sender, manager, auth):
+    local_document = client.post(
+        '/api/employee-services/documents/requests', headers=auth(sender),
+        json={'document_id': 'employment'},
+    ).get_json()['request']
+    local_start, local_end = future_range(offset=30, days=2)
+    local_leave = client.post(
+        '/api/employee-services/leave/requests', headers=auth(sender), json={
+            'leave_type': 'unpaid', 'starts_on': local_start, 'ends_on': local_end,
+        },
+    ).get_json()['request']
+
+    other_store = Store(name='Точка №2', address='Адрес 2', iiko_store_id='IIKO-2')
+    db.session.add(other_store)
+    db.session.flush()
+    other_sender = User(username='other-store-sender', full_name='Другой сотрудник',
+                        role=ROLE_SENDER, store_id=other_store.id)
+    other_sender.set_password('secret123')
+    db.session.add(other_sender)
+    db.session.commit()
+    client.post('/api/employee-services/documents/requests', headers=auth(other_sender),
+                json={'document_id': 'income'})
+    other_start, other_end = future_range(offset=50, days=2)
+    client.post('/api/employee-services/leave/requests', headers=auth(other_sender), json={
+        'leave_type': 'unpaid', 'starts_on': other_start, 'ends_on': other_end,
+    })
+
+    response = client.get('/api/manager/today', headers=auth(manager))
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['counts']['document_requests'] == 1
+    assert payload['counts']['leave_requests'] == 1
+    assert [item['request_id'] for item in payload['document_requests']] == [
+        local_document['request_id'],
+    ]
+    assert [item['request_id'] for item in payload['leave_requests']] == [
+        local_leave['request_id'],
+    ]

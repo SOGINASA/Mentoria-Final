@@ -202,7 +202,10 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 - `/api/tasks/manager...` — шаблоны, назначение и проверка менеджером.
 - `GET|POST /api/cases`, `POST /api/cases/{id}/messages` — обращения.
 - `GET /api/news`, `POST /api/news/{id}/read` — новости и отметка прочтения.
-- `GET /api/manager/today` — единая очередь смен, табелей, корректировок и задач.
+- `GET /api/manager/today` — единая очередь смен, табелей, корректировок, задач,
+  запросов документов и заявок на отсутствие. Все элементы фильтруются по
+  store scopes менеджера; новые типы добавлены в ответ отдельными массивами и
+  счётчиками `document_requests`/`leave_requests`.
 
 ## Сервисы сотрудника
 
@@ -224,6 +227,10 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 - `/api/employee-services/manager/documents/requests...` и
   `/api/employee-services/manager/leave/requests...` — scoped-очереди и решения
   менеджера/HR с optimistic `version`, audit и уведомлением сотрудника.
+
+При согласовании ежегодного отпуска backend повторно проверяет актуальный
+предварительный баланс. Если ранее была одобрена другая заявка и лимита уже не
+хватает, решение отклоняется с `409 Conflict` и текущим `leave_balance`.
 
 `leave_balance.preliminary=true` обязателен до подключения официальной
 HR-системы. `ANNUAL_LEAVE_ALLOWANCE_DAYS` и `ANNUAL_LEAVE_USED_DAYS` — временные

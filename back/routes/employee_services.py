@@ -258,12 +258,22 @@ def decide_leave_request(request_id):
         expected_version(data, item.version)
     except RuntimeError as exc:
         return jsonify({'error': str(exc)}), 409
+    requester = (User.query.filter_by(id=item.requester_id)
+                 .with_for_update().first())
+    if not requester:
+        return jsonify({'error': 'Сотрудник не найден'}), 409
+    if decision == 'approved' and item.leave_type == 'annual':
+        balance = leave_balance(requester, item.starts_on.year)
+        if item.days > balance['available_days']:
+            return jsonify({
+                'error': 'Недостаточно доступных дней отпуска для согласования',
+                'leave_balance': balance,
+            }), 409
     item.status = decision
     item.decision_reason = str(data.get('reason') or '').strip() or None
     item.decided_by_id = manager.id
     item.decided_at = utcnow()
     item.version += 1
-    requester = db.session.get(User, item.requester_id)
     notify(item.requester_id, 'leave_request_decided', 'Решение по отсутствию',
            body='Заявка согласована' if decision == 'approved' else 'Заявка отклонена',
            entity_type='leave_request', entity_id=item.id,
@@ -272,4 +282,4 @@ def decide_leave_request(request_id):
           item.store_id, {'reason': item.decision_reason})
     db.session.commit()
     return jsonify({'request': item.to_dict(),
-                    'leave_balance': leave_balance(requester) if requester else None})
+                    'leave_balance': leave_balance(requester)})
