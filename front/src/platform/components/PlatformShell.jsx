@@ -11,9 +11,10 @@ import { usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
 import {
   createPlatformNavigation,
+  getPlatformBackRoute,
   getPlatformRouteTitle,
+  isSecondaryPlatformRoute,
   PLATFORM_ROUTES,
-  SECONDARY_PLATFORM_ROUTES,
 } from '../platformConfig';
 
 function usePlatformNav() {
@@ -104,20 +105,20 @@ function PlatformHeader() {
   const user = useAuthStore((s) => s.user);
   const unread = useNotifyStore((s) => s.unread);
   const { p } = usePlatformCopy();
-  const secondary = SECONDARY_PLATFORM_ROUTES.has(pathname);
+  const secondary = isSecondaryPlatformRoute(pathname);
   const title = getPlatformRouteTitle(pathname, p);
 
   return (
     <header className="sticky top-0 z-20 flex h-16 flex-none items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur-md sm:px-6 lg:px-8">
       <button
         type="button"
-        onClick={() => secondary ? navigate(-1) : navigate(PLATFORM_ROUTES.home)}
+        onClick={() => navigate(secondary ? getPlatformBackRoute(pathname) : PLATFORM_ROUTES.home)}
         className="grid h-11 min-w-11 cursor-pointer place-items-center rounded-xl lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
         aria-label={secondary ? p.back : p.today}
       >
         {secondary ? <Icon name="chevronLeft" size={21} /> : <Logo size="sm" />}
       </button>
-      <div className="min-h-[100dvh] min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
         <h1 className="m-0 truncate font-head text-[20px] font-semibold tracking-wide text-text">{title}</h1>
         <span className="hidden text-[11px] font-medium text-muted sm:block">{p.platform}</span>
       </div>

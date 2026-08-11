@@ -19,6 +19,21 @@ const initialState = {
   tasks: INITIAL_PLATFORM_TASKS,
   shiftRequests: [],
   supportTickets: [],
+  learningProgress: {},
+  documentRequests: [],
+  leaveRequests: [
+    {
+      id: 'BH-L-2409',
+      type: 'annual',
+      typeLabel: 'Ежегодный оплачиваемый отпуск',
+      startDate: '2026-09-02',
+      endDate: '2026-09-08',
+      days: 7,
+      comment: '',
+      createdAt: '2026-07-18T09:30:00+06:00',
+      status: 'approved',
+    },
+  ],
   contactDetails: {
     phone: '+7 707 000 24 10',
     email: 'employee@bahandi.kz',
@@ -86,6 +101,73 @@ export const usePlatformStore = create(
         };
         set((state) => ({ supportTickets: [ticket, ...state.supportTickets] }));
         return ticket;
+      },
+
+      completeLearningModule(courseId, moduleId) {
+        set((state) => {
+          const current = state.learningProgress[courseId] || { completedModuleIds: [] };
+          if (current.completedModuleIds.includes(moduleId)) return state;
+          return {
+            learningProgress: {
+              ...state.learningProgress,
+              [courseId]: {
+                ...current,
+                completedModuleIds: [...current.completedModuleIds, moduleId],
+                updatedAt: new Date().toISOString(),
+              },
+            },
+          };
+        });
+      },
+
+      completeLearningAssessment(courseId, score) {
+        set((state) => {
+          const current = state.learningProgress[courseId] || { completedModuleIds: [] };
+          return {
+            learningProgress: {
+              ...state.learningProgress,
+              [courseId]: {
+                ...current,
+                assessmentPassed: score >= 80,
+                assessmentScore: score,
+                completedAt: score >= 80 ? new Date().toISOString() : current.completedAt,
+                updatedAt: new Date().toISOString(),
+              },
+            },
+          };
+        });
+      },
+
+      createDocumentRequest(payload) {
+        const request = {
+          ...payload,
+          id: createReference('BH-D'),
+          createdAt: new Date().toISOString(),
+          status: 'processing',
+        };
+        set((state) => ({ documentRequests: [request, ...state.documentRequests] }));
+        return request;
+      },
+
+      createLeaveRequest(payload) {
+        const request = {
+          ...payload,
+          id: createReference('BH-L'),
+          createdAt: new Date().toISOString(),
+          status: 'pending',
+        };
+        set((state) => ({ leaveRequests: [request, ...state.leaveRequests] }));
+        return request;
+      },
+
+      cancelLeaveRequest(requestId) {
+        set((state) => ({
+          leaveRequests: state.leaveRequests.map((request) => (
+            request.id === requestId && request.status === 'pending'
+              ? { ...request, status: 'cancelled' }
+              : request
+          )),
+        }));
       },
 
       updateContactDetails(contactDetails) {

@@ -43,7 +43,7 @@ export default function PlatformHomePage() {
 
   const quickActions = [
     { title: p.open_schedule, icon: 'calendar', tone: 'green', to: PLATFORM_ROUTES.shifts },
-    { title: p.swap_shift, icon: 'arrowSwap', tone: 'orange', to: PLATFORM_ROUTES.shifts },
+    { title: p.services, icon: 'grid', tone: 'orange', to: PLATFORM_ROUTES.services },
     { title: p.writeoff, icon: 'camera', tone: 'amber', to: '/create' },
     { title: p.ask_help, icon: 'helpCircle', tone: 'green', to: PLATFORM_ROUTES.support },
   ];

@@ -49,4 +49,34 @@ describe('platformStore', () => {
       email: 'test@bahandi.kz',
     });
   });
+
+  test('persists learning progress without duplicating completed modules', () => {
+    const store = usePlatformStore.getState();
+    store.completeLearningModule('service-standards', 'welcome');
+    usePlatformStore.getState().completeLearningModule('service-standards', 'welcome');
+
+    expect(usePlatformStore.getState().learningProgress['service-standards'].completedModuleIds).toEqual(['welcome']);
+
+    usePlatformStore.getState().completeLearningAssessment('service-standards', 100);
+    expect(usePlatformStore.getState().learningProgress['service-standards'].assessmentPassed).toBe(true);
+  });
+
+  test('creates document and leave requests and allows pending leave cancellation', () => {
+    const documentRequest = usePlatformStore.getState().createDocumentRequest({
+      documentId: 'employment',
+      title: 'Справка с места работы',
+    });
+    const leaveRequest = usePlatformStore.getState().createLeaveRequest({
+      type: 'annual',
+      typeLabel: 'Ежегодный оплачиваемый отпуск',
+      startDate: '2026-10-01',
+      endDate: '2026-10-03',
+      days: 3,
+    });
+
+    expect(documentRequest.id).toMatch(/^BH-D-/);
+    expect(leaveRequest.id).toMatch(/^BH-L-/);
+    usePlatformStore.getState().cancelLeaveRequest(leaveRequest.id);
+    expect(usePlatformStore.getState().leaveRequests.find((item) => item.id === leaveRequest.id).status).toBe('cancelled');
+  });
 });

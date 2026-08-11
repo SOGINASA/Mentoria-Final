@@ -7,8 +7,9 @@ import { usePlatformStore } from '../../store/platformStore';
 import { HOME_ROUTE_BY_ROLE } from '../../constants/roles';
 import { initials } from '../../utils/format';
 import { usePlatformCopy } from '../platformCopy';
+import { PLATFORM_ROUTES } from '../platformConfig';
 import PlatformModal from '../components/PlatformModal';
-import { DetailRow, IconTile, PageIntro, PlatformButton, PlatformCard, PlatformField, ProgressBar, SectionHeading, StatusPill } from '../components/PlatformUi';
+import { IconTile, PageIntro, PlatformButton, PlatformCard, PlatformField, SectionHeading } from '../components/PlatformUi';
 
 function SettingToggle({ checked, onChange, label }) {
   return (
@@ -51,26 +52,19 @@ export default function PlatformProfilePage() {
   const [panel, setPanel] = useState(null);
   const contactDetails = usePlatformStore((state) => state.contactDetails);
   const updateContactDetails = usePlatformStore((state) => state.updateContactDetails);
-  const createSupportTicket = usePlatformStore((state) => state.createSupportTicket);
   const [contactDraft, setContactDraft] = useState(contactDetails);
   const [contactErrors, setContactErrors] = useState({});
-  const currentYear = new Date().getFullYear();
 
   const hrItems = [
-    { id: 'documents', icon: 'clipboard', tone: 'green', title: p.documents, subtitle: 'Договоры, справки и расчётные документы' },
-    { id: 'vacation', icon: 'calendar', tone: 'orange', title: p.vacation, subtitle: 'Баланс дней, заявки и статусы' },
-    { id: 'learning', icon: 'book', tone: 'amber', title: p.learning_center, subtitle: 'Курсы, навыки и действующие допуски' },
-    { id: 'support', icon: 'helpCircle', tone: 'green', title: p.support, subtitle: 'Вопросы HR, payroll и операционной команде' },
+    { id: 'documents', to: PLATFORM_ROUTES.documents, icon: 'clipboard', tone: 'green', title: p.documents, subtitle: 'Договоры, справки и расчётные документы' },
+    { id: 'vacation', to: PLATFORM_ROUTES.leave, icon: 'calendar', tone: 'orange', title: p.vacation, subtitle: 'Баланс дней, заявки и статусы' },
+    { id: 'learning', to: PLATFORM_ROUTES.learning, icon: 'book', tone: 'amber', title: p.learning_center, subtitle: 'Курсы, навыки и действующие допуски' },
+    { id: 'support', to: PLATFORM_ROUTES.support, icon: 'helpCircle', tone: 'green', title: p.support, subtitle: 'Вопросы HR, payroll и операционной команде' },
   ];
 
   function onLogout() {
     logout();
     navigate('/login', { replace: true });
-  }
-
-  function openHrItem(id) {
-    if (id === 'support') navigate('/app/support');
-    else setPanel(id);
   }
 
   function saveProfile() {
@@ -86,14 +80,6 @@ export default function PlatformProfilePage() {
     });
     setPanel(null);
     showToast('Контактные данные сохранены');
-  }
-
-  function requestDocument(title) {
-    const ticket = createSupportTicket({
-      category: 'hr',
-      message: `Запрос документа: ${title}`,
-    });
-    showToast(`Запрос ${ticket.id} создан`);
   }
 
   return (
@@ -135,10 +121,10 @@ export default function PlatformProfilePage() {
 
       <div className="mt-7 grid gap-6 lg:grid-cols-2">
         <section>
-          <SectionHeading title={p.hr_services} />
+          <SectionHeading title={p.hr_services} action={<button type="button" onClick={() => navigate(PLATFORM_ROUTES.services)} className="min-h-11 rounded-xl px-2 text-[12px] font-bold text-green transition-colors hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">Все сервисы</button>} />
           <PlatformCard className="overflow-hidden">
             {hrItems.map((item) => (
-              <ProfileRow key={item.title} {...item} onClick={() => openHrItem(item.id)} />
+              <ProfileRow key={item.title} {...item} onClick={() => navigate(item.to)} />
             ))}
           </PlatformCard>
         </section>
@@ -194,32 +180,6 @@ export default function PlatformProfilePage() {
           <PlatformField label="Рабочая почта" type="email" value={contactDraft.email} error={contactErrors.email} onChange={(event) => { setContactDraft((draft) => ({ ...draft, email: event.target.value })); setContactErrors((errors) => ({ ...errors, email: null })); }} autoComplete="email" />
         </div>
         <div className="mt-4 rounded-2xl bg-surface2 p-4 text-[12px] leading-relaxed text-muted">ФИО, должность и торговая точка синхронизируются с кадровой системой.</div>
-      </PlatformModal>
-
-      <PlatformModal open={panel === 'documents'} onClose={() => setPanel(null)} title={p.documents} subtitle="Актуальные документы сотрудника" size="lg" footer={<PlatformButton variant="secondary" onClick={() => setPanel(null)}>Закрыть</PlatformButton>}>
-        <div className="space-y-2">
-          {[
-            ['Трудовой договор', 'PDF • обновлён 12.06.2025'],
-            [`Расчётный лист • ${currentYear}`, 'PDF • 184 КБ'],
-            ['Справка с места работы', 'Формируется по запросу'],
-          ].map(([title, meta]) => (
-            <div key={title} className="flex min-h-[72px] items-center gap-3 rounded-2xl border border-line p-3.5">
-              <IconTile icon="fileText" tone="green" size="sm" />
-              <div className="min-w-0 flex-1"><div className="text-[13px] font-bold text-text">{title}</div><div className="mt-1 text-[11px] text-muted">{meta}</div></div>
-              <button type="button" onClick={() => requestDocument(title)} className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl bg-surface2 text-green hover:bg-green-tint active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green" aria-label={`Запросить ${title}`}><Icon name="send" size={19} /></button>
-            </div>
-          ))}
-        </div>
-      </PlatformModal>
-
-      <PlatformModal open={panel === 'vacation'} onClose={() => setPanel(null)} title={p.vacation} subtitle="Баланс и ближайшие заявки" footer={<><PlatformButton variant="secondary" onClick={() => setPanel(null)}>Закрыть</PlatformButton><PlatformButton icon="plus" onClick={() => { setPanel(null); showToast('Черновик заявки создан'); }}>Новая заявка</PlatformButton></>}>
-        <div className="rounded-2xl bg-orange-tint p-5"><div className="text-[11px] font-bold uppercase tracking-[.1em] text-orange">Доступно</div><div className="mt-2 font-head text-[36px] font-semibold text-orange">12 дней</div><div className="mt-1 text-[12px] text-muted">из 24 дней в {currentYear} году</div></div>
-        <div className="mt-5"><DetailRow icon="calendar" label="Запланировано" value="2–8 сентября" /><DetailRow icon="checkCircle" label="Статус заявки" value="Согласовано" /><DetailRow icon="clock" label="Следующее начисление" value="1 сентября" /></div>
-      </PlatformModal>
-
-      <PlatformModal open={panel === 'learning'} onClose={() => setPanel(null)} title={p.learning_center} subtitle="Обязательные курсы и развитие" footer={<PlatformButton variant="secondary" onClick={() => setPanel(null)}>Закрыть</PlatformButton>}>
-        <div className="rounded-2xl border border-line p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-bold text-text">Стандарты сервиса</div><div className="mt-1 text-[11px] text-muted">4 из 6 уроков</div></div><StatusPill tone="amber">В процессе</StatusPill></div><div className="mt-4"><ProgressBar value={67} /></div><PlatformButton className="mt-4 w-full" icon="play" onClick={() => showToast('Урок открыт')}>Продолжить обучение</PlatformButton></div>
-        <div className="mt-3 rounded-2xl border border-line p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-bold text-text">Безопасность на кухне</div><div className="mt-1 text-[11px] text-muted">Допуск действует до июня 2027</div></div><StatusPill>Пройдено</StatusPill></div></div>
       </PlatformModal>
 
       <PlatformModal open={panel === 'logout'} onClose={() => setPanel(null)} title="Выйти из аккаунта?" subtitle="Для следующего входа снова потребуются данные авторизации" footer={<><PlatformButton variant="secondary" onClick={() => setPanel(null)}>Отмена</PlatformButton><PlatformButton variant="danger" icon="logout" onClick={onLogout}>{p.logout}</PlatformButton></>}>

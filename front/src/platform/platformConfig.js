@@ -7,13 +7,36 @@ export const PLATFORM_ROUTES = Object.freeze({
   notifications: '/app/notifications',
   support: '/app/support',
   news: '/app/news',
+  services: '/app/services',
+  learning: '/app/learning',
+  documents: '/app/documents',
+  leave: '/app/leave',
 });
 
-export const SECONDARY_PLATFORM_ROUTES = new Set([
+const SECONDARY_PLATFORM_ROUTES = [
   PLATFORM_ROUTES.notifications,
   PLATFORM_ROUTES.support,
   PLATFORM_ROUTES.news,
-]);
+  PLATFORM_ROUTES.services,
+  PLATFORM_ROUTES.learning,
+  PLATFORM_ROUTES.documents,
+  PLATFORM_ROUTES.leave,
+];
+
+export function isSecondaryPlatformRoute(pathname) {
+  return SECONDARY_PLATFORM_ROUTES.some((route) => (
+    pathname === route || pathname.startsWith(`${route}/`)
+  ));
+}
+
+export function getPlatformBackRoute(pathname) {
+  if (pathname.startsWith(`${PLATFORM_ROUTES.learning}/`)) return PLATFORM_ROUTES.learning;
+  if ([PLATFORM_ROUTES.learning, PLATFORM_ROUTES.documents, PLATFORM_ROUTES.leave, PLATFORM_ROUTES.support].includes(pathname)) {
+    return PLATFORM_ROUTES.services;
+  }
+  if (pathname === PLATFORM_ROUTES.services) return PLATFORM_ROUTES.profile;
+  return PLATFORM_ROUTES.home;
+}
 
 export function createPlatformNavigation(copy, pendingTaskCount = 0) {
   return [
@@ -40,6 +63,16 @@ export function getPlatformRouteTitle(pathname, copy) {
     [PLATFORM_ROUTES.notifications]: copy.notifications,
     [PLATFORM_ROUTES.support]: copy.support,
     [PLATFORM_ROUTES.news]: copy.news,
+    [PLATFORM_ROUTES.services]: copy.services,
+    [PLATFORM_ROUTES.learning]: copy.learning_center,
+    [PLATFORM_ROUTES.documents]: copy.documents,
+    [PLATFORM_ROUTES.leave]: copy.vacation,
   };
-  return titles[pathname] || copy.platform;
+  const exactTitle = titles[pathname];
+  if (exactTitle) return exactTitle;
+
+  const parentRoute = Object.keys(titles).find((route) => pathname.startsWith(`${route}/`));
+  return titles[parentRoute] || copy.platform;
 }
+
+export { SECONDARY_PLATFORM_ROUTES };

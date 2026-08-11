@@ -1,6 +1,7 @@
 import fs from 'fs';
 import {
   createPlatformNavigation,
+  getPlatformBackRoute,
   PLATFORM_ROUTES,
 } from '../platform/platformConfig';
 
@@ -33,11 +34,17 @@ describe('staff platform route contract', () => {
 
   test('AppRouter declares every platform destination', () => {
     const source = fs.readFileSync(require.resolve('./AppRouter'), 'utf8');
-    const routeSegments = ['', 'shifts', 'income', 'tasks', 'profile', 'notifications', 'support', 'news'];
+    const routeSegments = ['', 'shifts', 'income', 'tasks', 'profile', 'notifications', 'support', 'news', 'services', 'learning', 'documents', 'leave'];
 
     expect(source).toContain('path="/app"');
     routeSegments.filter(Boolean).forEach((segment) => {
       expect(source).toContain(`path="${segment}"`);
     });
+  });
+
+  test('deep service routes have a predictable parent route', () => {
+    expect(getPlatformBackRoute('/app/learning/service-standards')).toBe(PLATFORM_ROUTES.learning);
+    expect(getPlatformBackRoute(PLATFORM_ROUTES.documents)).toBe(PLATFORM_ROUTES.services);
+    expect(getPlatformBackRoute(PLATFORM_ROUTES.services)).toBe(PLATFORM_ROUTES.profile);
   });
 });

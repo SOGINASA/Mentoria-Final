@@ -27,6 +27,11 @@ const PlatformProfilePage = lazy(() => import('../platform/pages/PlatformProfile
 const PlatformNotificationsPage = lazy(() => import('../platform/pages/PlatformNotificationsPage'));
 const PlatformSupportPage = lazy(() => import('../platform/pages/PlatformSupportPage'));
 const PlatformNewsPage = lazy(() => import('../platform/pages/PlatformNewsPage'));
+const PlatformServicesPage = lazy(() => import('../platform/pages/PlatformServicesPage'));
+const PlatformLearningPage = lazy(() => import('../platform/pages/PlatformLearningPage'));
+const PlatformCoursePage = lazy(() => import('../platform/pages/PlatformCoursePage'));
+const PlatformDocumentsPage = lazy(() => import('../platform/pages/PlatformDocumentsPage'));
+const PlatformLeavePage = lazy(() => import('../platform/pages/PlatformLeavePage'));
 const PlatformComingSoonPage = lazy(() => import('../platform/pages/PlatformComingSoonPage'));
 
 const sender = (el) => <RequireRole roles={[ROLE_SENDER]}>{el}</RequireRole>;
@@ -67,6 +72,11 @@ export default function AppRouter() {
         <Route path="notifications" element={platformPage(<PlatformNotificationsPage />)} />
         <Route path="support" element={platformPage(<PlatformSupportPage />)} />
         <Route path="news" element={platformPage(<PlatformNewsPage />)} />
+        <Route path="services" element={platformPage(<PlatformServicesPage />)} />
+        <Route path="learning" element={platformPage(<PlatformLearningPage />)} />
+        <Route path="learning/:courseId" element={platformPage(<PlatformCoursePage />)} />
+        <Route path="documents" element={platformPage(<PlatformDocumentsPage />)} />
+        <Route path="leave" element={platformPage(<PlatformLeavePage />)} />
         <Route path="*" element={platformPage(<PlatformComingSoonPage />)} />
       </Route>
 
