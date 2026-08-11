@@ -22,28 +22,24 @@ export default function PlatformServicesPage() {
   return (
     <div className="mx-auto w-full max-w-[1180px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
       <PageIntro
-        eyebrow="Рабочее пространство"
-        title="Сервисы сотрудника"
+        eyebrow="Сервисы сотрудника"
+        title="Всё необходимое для работы"
         subtitle="Обучение, кадровые документы, отпуск и обращения — с понятным статусом каждого действия."
       />
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <PlatformCard className="p-4 sm:p-5">
-          <div className="text-[11px] font-bold uppercase tracking-[.1em] text-muted">Обучение</div>
-          <div className="mt-2 font-head text-[27px] font-semibold text-text">{completedCourses} из {LEARNING_COURSES.length}</div>
-          <div className="mt-1 text-[12px] text-muted">курсов завершено</div>
-        </PlatformCard>
-        <PlatformCard className="p-4 sm:p-5">
-          <div className="text-[11px] font-bold uppercase tracking-[.1em] text-muted">Отпуск</div>
-          <div className="mt-2 font-head text-[27px] font-semibold text-text">{leaveBalance.available_days} дней</div>
-          <div className="mt-1 text-[12px] text-muted">доступно{leaveBalance.preliminary ? ' предварительно' : ''}</div>
-        </PlatformCard>
-        <PlatformCard className="p-4 sm:p-5">
-          <div className="text-[11px] font-bold uppercase tracking-[.1em] text-muted">Заявки</div>
-          <div className="mt-2 font-head text-[27px] font-semibold text-text">{pendingRequests}</div>
-          <div className="mt-1 text-[12px] text-muted">ожидают решения</div>
-        </PlatformCard>
-      </div>
+      <PlatformCard className="mt-6 grid grid-cols-3 divide-x divide-line2 overflow-hidden">
+        {[
+          ['Обучение', `${completedCourses}/${LEARNING_COURSES.length}`, 'курсов'],
+          ['Отпуск', leaveBalance.available_days, leaveBalance.preliminary ? 'дней • предвар.' : 'дней'],
+          ['Заявки', pendingRequests, 'в работе'],
+        ].map(([label, value, meta]) => (
+          <div key={label} className="min-w-0 px-3 py-4 text-center sm:px-5 sm:py-5">
+            <div className="truncate text-[10px] font-bold uppercase tracking-[.08em] text-muted sm:text-[11px]">{label}</div>
+            <div className="mt-1.5 font-head text-[23px] font-semibold tabular-nums text-text sm:text-[27px]">{value}</div>
+            <div className="mt-0.5 truncate text-[10px] text-muted sm:text-[11px]">{meta}</div>
+          </div>
+        ))}
+      </PlatformCard>
 
       <section className="mt-8">
         <SectionHeading title="Все сервисы" />
@@ -54,8 +50,8 @@ export default function PlatformServicesPage() {
               to={PLATFORM_ROUTES[service.routeKey]}
               className="group rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
-              <PlatformCard className="flex min-h-[126px] items-center gap-4 p-5 transition-[transform,border-color,box-shadow] duration-200 group-hover:-translate-y-0.5 group-hover:border-green group-hover:shadow-card group-active:translate-y-0">
-                <IconTile icon={service.icon} tone={service.tone} />
+              <PlatformCard className="flex min-h-[112px] items-center gap-4 p-4 transition-[background-color,border-color,box-shadow] duration-200 group-hover:border-green group-hover:bg-surface2 group-hover:shadow-card sm:p-5">
+                <IconTile icon={service.icon} tone="green" />
                 <div className="min-w-0 flex-1">
                   <h3 className="m-0 font-head text-[19px] font-semibold text-text">{service.title}</h3>
                   <p className="mb-0 mt-1.5 text-[12px] leading-relaxed text-muted">{service.subtitle}</p>
