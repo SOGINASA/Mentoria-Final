@@ -48,3 +48,5 @@ ml/yolov8n.pt
 ml/yolov8n-cls.pt
 ml/best.pt
 ml/data.yaml
+
+AGENTS.md
