@@ -21,7 +21,8 @@ function usePlatformNav() {
   const pendingTaskCount = usePlatformStore((state) => (
     state.tasks.filter((task) => !task.done).length
   ));
-  return createPlatformNavigation(p, pendingTaskCount);
+  const flags = usePlatformStore((state) => state.featureFlags);
+  return createPlatformNavigation(p, pendingTaskCount, flags);
 }
 
 function PlatformSidebar() {
@@ -117,7 +118,7 @@ function PlatformHeader() {
       >
         {secondary ? <Icon name="chevronLeft" size={21} /> : <Logo size="sm" />}
       </button>
-      <div className="min-h-[100dvh] min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
         <h1 className="m-0 truncate font-head text-[20px] font-semibold tracking-wide text-text">{title}</h1>
         <span className="hidden text-[11px] font-medium text-muted sm:block">{p.platform}</span>
       </div>
@@ -149,7 +150,7 @@ function PlatformHeader() {
 function PlatformBottomNav() {
   const nav = usePlatformNav();
   return (
-    <nav aria-label="Platform navigation" className="fixed inset-x-0 bottom-0 z-30 grid h-[72px] grid-cols-5 border-t border-line bg-surface/95 px-1 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md lg:hidden">
+    <nav aria-label="Platform navigation" className="fixed inset-x-0 bottom-0 z-30 grid h-[72px] grid-flow-col auto-cols-fr border-t border-line bg-surface/95 px-1 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md lg:hidden">
       {nav.map((item) => (
         <NavLink
           key={item.to}
@@ -184,11 +185,13 @@ export default function PlatformShell() {
   const mainRef = useRef(null);
   const startPolling = useNotifyStore((s) => s.startPolling);
   const stopPolling = useNotifyStore((s) => s.stopPolling);
+  const hydrate = usePlatformStore((s) => s.hydrate);
 
   useEffect(() => {
     startPolling();
+    hydrate().catch(() => {});
     return () => stopPolling();
-  }, [startPolling, stopPolling]);
+  }, [hydrate, startPolling, stopPolling]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });

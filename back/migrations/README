@@ -1,0 +1,3 @@
+Single-database Alembic migrations for the Bahandi Flask backend.
+
+Apply with: ``python -m flask --app app db upgrade``.

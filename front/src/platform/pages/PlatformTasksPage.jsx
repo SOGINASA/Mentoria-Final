@@ -37,17 +37,25 @@ export default function PlatformTasksPage() {
   const doneCount = tasks.filter((task) => task.done).length;
   const typeLabel = (type) => type === 'checklist' ? p.checklist : type === 'learning' ? p.learning : p.operation;
 
-  function toggleTask(id) {
+  async function toggleTask(id) {
     const target = tasks.find((task) => task.id === id);
-    toggleStoredTask(id);
-    showToast(target?.done ? p.reopen : p.task_completed);
+    try {
+      await toggleStoredTask(id);
+      showToast(target?.done ? p.reopen : p.task_completed);
+    } catch (error) {
+      showToast(error.message);
+    }
   }
 
-  function completeSelectedTask() {
+  async function completeSelectedTask() {
     if (!selectedTask) return;
-    completeTask(selectedTask.id);
-    setSelectedTaskId(null);
-    showToast(p.task_completed);
+    try {
+      await completeTask(selectedTask.id);
+      setSelectedTaskId(null);
+      showToast(p.task_completed);
+    } catch (error) {
+      showToast(error.message);
+    }
   }
 
   return (
@@ -65,7 +73,7 @@ export default function PlatformTasksPage() {
               </div>
             </div>
           </div>
-          <ProgressBar value={Math.round((doneCount / tasks.length) * 100)} label={p.tasks_done} />
+          <ProgressBar value={tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0} label={p.tasks_done} />
         </div>
       </PlatformCard>
 
@@ -149,7 +157,7 @@ export default function PlatformTasksPage() {
             {selectedTask?.type === 'checklist' && selectedTask.steps?.length ? (
               <div className="mt-5 space-y-2">
                 {selectedTask.steps.map((step) => (
-                  <button key={step.id} type="button" onClick={() => toggleTaskStep(selectedTask.id, step.id)} className={`flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left transition-colors active:scale-[.99] ${step.done ? 'border-green bg-green-tint' : 'border-line bg-surface hover:bg-surface2'}`}>
+                  <button key={step.id} type="button" onClick={() => toggleTaskStep(selectedTask.id, step.id).catch((error) => showToast(error.message))} className={`flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left transition-colors active:scale-[.99] ${step.done ? 'border-green bg-green-tint' : 'border-line bg-surface hover:bg-surface2'}`}>
                     <span className={`grid h-7 w-7 flex-none place-items-center rounded-lg border ${step.done ? 'border-brand bg-brand text-on-brand' : 'border-line bg-surface text-transparent'}`}><Icon name="check" size={15} strokeWidth={3} /></span>
                     <span className={`text-[13px] font-semibold ${step.done ? 'text-green line-through' : 'text-text'}`}>{step.title}</span>
                   </button>

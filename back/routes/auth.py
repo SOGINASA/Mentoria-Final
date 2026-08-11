@@ -72,7 +72,8 @@ def me():
     user = get_current_user()
     if not user or not user.is_active:
         return jsonify({'error': 'Пользователь не найден'}), 404
-    return jsonify({'user': user.to_dict()})
+    from routes.platform import user_context
+    return jsonify(user_context(user))
 
 
 @auth_bp.route('/change-password', methods=['POST'])

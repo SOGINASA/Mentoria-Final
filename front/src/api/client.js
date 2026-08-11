@@ -67,8 +67,8 @@ async function tryRefresh() {
  * @param {FormData} [opts.form]  — multipart-тело (для загрузки фото)
  * @param {boolean} [opts.auth]   — слать токен (по умолчанию true)
  */
-export async function request(path, { method = 'GET', body, form, auth = true } = {}) {
-  const headers = {};
+export async function request(path, { method = 'GET', body, form, auth = true, headers: customHeaders = {} } = {}) {
+  const headers = { ...customHeaders };
   let payload;
 
   if (form) {
@@ -105,6 +105,7 @@ export async function request(path, { method = 'GET', body, form, auth = true } 
 export const api = {
   get: (path) => request(path),
   post: (path, body) => request(path, { method: 'POST', body }),
+  patch: (path, body) => request(path, { method: 'PATCH', body }),
   put: (path, body) => request(path, { method: 'PUT', body }),
   del: (path) => request(path, { method: 'DELETE' }),
   upload: (path, form) => request(path, { method: 'POST', form }),

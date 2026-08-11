@@ -47,7 +47,8 @@ pip install -r requirements.txt
 cp .env.example .env          # при необходимости поправить
 
 # создать таблицы + демо-данные
-flask --app app init-db
+flask --app app db upgrade
+flask --app app seed
 
 # запустить
 python app.py                 # http://localhost:5252

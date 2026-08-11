@@ -3,7 +3,11 @@ import Foundation
 // Значения совпадают с back/constants.py
 enum Role {
     static let sender = "sender"
+    static let manager = "manager"
     static let reviewer = "reviewer"
+    static let hr = "hr"
+    static let finance = "finance"
+    static let operations = "operations"
     static let admin = "admin"
 }
 enum WStatus {

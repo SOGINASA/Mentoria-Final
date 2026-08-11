@@ -24,7 +24,8 @@ export default function PlatformNotificationsPage() {
 
   function openNotification(item) {
     if (!item.is_read) markRead(item.id);
-    if (item.write_off_id) navigate(role === ROLE_SENDER ? `/my-requests/${item.write_off_id}` : `/review/${item.write_off_id}`);
+    if (item.action_url) navigate(item.action_url);
+    else if (item.write_off_id) navigate(role === ROLE_SENDER ? `/my-requests/${item.write_off_id}` : `/review/${item.write_off_id}`);
   }
 
   return (
