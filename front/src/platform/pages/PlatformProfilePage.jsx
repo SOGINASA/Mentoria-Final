@@ -52,28 +52,19 @@ export default function PlatformProfilePage() {
   const [panel, setPanel] = useState(null);
   const contactDetails = usePlatformStore((state) => state.contactDetails);
   const updateContactDetails = usePlatformStore((state) => state.updateContactDetails);
-  const createSupportTicket = usePlatformStore((state) => state.createSupportTicket);
-  const hrEnabled = usePlatformStore((state) => state.featureFlags.hr_services);
   const [contactDraft, setContactDraft] = useState(contactDetails);
   const [contactErrors, setContactErrors] = useState({});
 
   const hrItems = [
-    ...(hrEnabled ? [
-      { id: 'documents', icon: 'clipboard', tone: 'green', title: p.documents, subtitle: 'Договоры, справки и расчётные документы' },
-      { id: 'vacation', icon: 'calendar', tone: 'orange', title: p.vacation, subtitle: 'Баланс дней, заявки и статусы' },
-      { id: 'learning', icon: 'book', tone: 'amber', title: p.learning_center, subtitle: 'Курсы, навыки и действующие допуски' },
-    ] : []),
-    { id: 'support', icon: 'helpCircle', tone: 'green', title: p.support, subtitle: 'Вопросы HR, payroll и операционной команде' },
+    { id: 'documents', to: PLATFORM_ROUTES.documents, icon: 'clipboard', tone: 'green', title: p.documents, subtitle: 'Договоры, справки и расчётные документы' },
+    { id: 'vacation', to: PLATFORM_ROUTES.leave, icon: 'calendar', tone: 'orange', title: p.vacation, subtitle: 'Баланс дней, заявки и статусы' },
+    { id: 'learning', to: PLATFORM_ROUTES.learning, icon: 'book', tone: 'amber', title: p.learning_center, subtitle: 'Курсы, навыки и действующие допуски' },
+    { id: 'support', to: PLATFORM_ROUTES.support, icon: 'helpCircle', tone: 'green', title: p.support, subtitle: 'Вопросы HR, payroll и операционной команде' },
   ];
 
   function onLogout() {
     logout();
     navigate('/login', { replace: true });
-  }
-
-  function openHrItem(id) {
-    if (id === 'support') navigate('/app/support');
-    else setPanel(id);
   }
 
   async function saveProfile() {
@@ -90,16 +81,6 @@ export default function PlatformProfilePage() {
       });
       setPanel(null);
       showToast('Контактные данные сохранены');
-    } catch (error) { showToast(error.message); }
-  }
-
-  async function requestDocument(title) {
-    try {
-      const ticket = await createSupportTicket({
-        category: 'hr',
-        message: `Запрос документа: ${title}`,
-      });
-      showToast(`Запрос ${ticket.id} создан`);
     } catch (error) { showToast(error.message); }
   }
 

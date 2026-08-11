@@ -20,6 +20,11 @@ function idempotencyKey() {
   return `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function localReference(prefix) {
+  const timePart = Date.now().toString(36).slice(-5).toUpperCase();
+  return `${prefix}-${timePart}`;
+}
+
 const initialState = {
   hydrated: false,
   loading: false,
@@ -31,6 +36,21 @@ const initialState = {
   tasks: [],
   shiftRequests: [],
   supportTickets: [],
+  learningProgress: {},
+  documentRequests: [],
+  leaveRequests: [
+    {
+      id: 'BH-L-2409',
+      type: 'annual',
+      typeLabel: 'Ежегодный оплачиваемый отпуск',
+      startDate: '2026-09-02',
+      endDate: '2026-09-08',
+      days: 7,
+      comment: '',
+      createdAt: '2026-07-18T09:30:00+06:00',
+      status: 'approved',
+    },
+  ],
   news: [],
   timecards: [],
   featureFlags: {
@@ -183,6 +203,74 @@ export const usePlatformStore = create(
           ? { ...post, is_read: true } : post) }));
       },
 
+      completeLearningModule(courseId, moduleId) {
+        set((state) => {
+          const current = state.learningProgress[courseId] || { completedModuleIds: [] };
+          if (current.completedModuleIds.includes(moduleId)) return state;
+          return {
+            learningProgress: {
+              ...state.learningProgress,
+              [courseId]: {
+                ...current,
+                completedModuleIds: [...current.completedModuleIds, moduleId],
+                updatedAt: new Date().toISOString(),
+              },
+            },
+          };
+        });
+      },
+
+      completeLearningAssessment(courseId, score) {
+        set((state) => {
+          const current = state.learningProgress[courseId] || { completedModuleIds: [] };
+          const passed = score >= 80;
+          return {
+            learningProgress: {
+              ...state.learningProgress,
+              [courseId]: {
+                ...current,
+                assessmentPassed: passed,
+                assessmentScore: score,
+                completedAt: passed ? new Date().toISOString() : current.completedAt,
+                updatedAt: new Date().toISOString(),
+              },
+            },
+          };
+        });
+      },
+
+      createDocumentRequest(payload) {
+        const request = {
+          ...payload,
+          id: localReference('BH-D'),
+          createdAt: new Date().toISOString(),
+          status: 'processing',
+        };
+        set((state) => ({ documentRequests: [request, ...state.documentRequests] }));
+        return request;
+      },
+
+      createLeaveRequest(payload) {
+        const request = {
+          ...payload,
+          id: localReference('BH-L'),
+          createdAt: new Date().toISOString(),
+          status: 'pending',
+        };
+        set((state) => ({ leaveRequests: [request, ...state.leaveRequests] }));
+        return request;
+      },
+
+      cancelLeaveRequest(requestId) {
+        set((state) => ({
+          leaveRequests: state.leaveRequests.map((request) => (
+            request.id === requestId && request.status === 'pending'
+              ? { ...request, status: 'cancelled' }
+              : request
+          )),
+        }));
+      },
+
       resetPlatformState() {
         set(initialState);
       },
@@ -196,6 +284,9 @@ export const usePlatformStore = create(
         tasks: state.tasks,
         featureFlags: state.featureFlags,
         contactDetails: state.contactDetails,
+        learningProgress: state.learningProgress,
+        documentRequests: state.documentRequests,
+        leaveRequests: state.leaveRequests,
       }),
     },
   ),
