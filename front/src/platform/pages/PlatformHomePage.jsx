@@ -32,14 +32,19 @@ export default function PlatformHomePage() {
   const user = useAuthStore((s) => s.user);
   const showToast = useUiStore((s) => s.showToast);
   const shiftActive = usePlatformStore((state) => state.shiftActive);
-  const setShiftActive = usePlatformStore((state) => state.setShiftActive);
+  const toggleStoredShift = usePlatformStore((state) => state.toggleShift);
+  const shifts = usePlatformStore((state) => state.shifts);
   const tasks = usePlatformStore((state) => state.tasks);
+  const timecards = usePlatformStore((state) => state.timecards);
 
   const date = new Intl.DateTimeFormat(lang === 'kz' ? 'kk-KZ' : 'ru-RU', {
     weekday: 'long', day: 'numeric', month: 'long',
   }).format(new Date());
 
   const priorityTasks = tasks.filter((task) => !task.done).slice(0, 3);
+  const confirmedMinutes = timecards
+    .filter((card) => ['approved', 'corrected'].includes(card.status))
+    .reduce((total, card) => total + (card.worked_minutes || 0), 0);
 
   const quickActions = [
     { title: p.open_schedule, icon: 'calendar', tone: 'green', to: PLATFORM_ROUTES.shifts },
@@ -48,10 +53,19 @@ export default function PlatformHomePage() {
     { title: p.ask_help, icon: 'helpCircle', tone: 'green', to: PLATFORM_ROUTES.support },
   ];
 
-  function toggleShift() {
-    setShiftActive(!shiftActive);
-    showToast(shiftActive ? p.end_shift : p.shift_started);
+  async function toggleShift() {
+    try {
+      await toggleStoredShift();
+      showToast(shiftActive ? p.end_shift : p.shift_started);
+    } catch (error) {
+      showToast(error.message);
+    }
   }
+
+  const todayShift = shifts[0];
+  const shiftTime = todayShift
+    ? `${new Date(todayShift.starts_at).toLocaleTimeString(lang === 'kz' ? 'kk-KZ' : 'ru-RU', { hour: '2-digit', minute: '2-digit' })}–${new Date(todayShift.ends_at).toLocaleTimeString(lang === 'kz' ? 'kk-KZ' : 'ru-RU', { hour: '2-digit', minute: '2-digit' })}`
+    : 'Смена не назначена';
 
   return (
     <div className="mx-auto w-full max-w-[1480px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
@@ -69,10 +83,10 @@ export default function PlatformHomePage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-[12px] font-bold uppercase tracking-[.12em] text-white/70">{p.shift_today}</div>
-                <div className="mt-2 font-head text-[31px] font-semibold leading-none sm:text-[38px]">09:00–18:00</div>
+                <div className="mt-2 font-head text-[31px] font-semibold leading-none sm:text-[38px]">{shiftTime}</div>
               </div>
               <StatusPill tone={shiftActive ? 'orange' : 'green'}>
-                {shiftActive ? p.shift_started : `${p.shift_in}: 32 мин`}
+                {shiftActive ? p.shift_started : (todayShift ? p.published : p.no_tasks)}
               </StatusPill>
             </div>
 
@@ -101,6 +115,7 @@ export default function PlatformHomePage() {
               <button
                 type="button"
                 onClick={toggleShift}
+                disabled={!todayShift && !shiftActive}
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-[14px] font-bold text-green shadow-card-sm transition-colors hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-green"
               >
                 <Icon name={shiftActive ? 'stop' : 'play'} size={18} />
@@ -113,17 +128,17 @@ export default function PlatformHomePage() {
         <PlatformCard className="p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-[12px] font-bold uppercase tracking-[.1em] text-muted">{p.forecast}</div>
-              <div className="mt-2 font-head text-[31px] font-semibold tabular-nums text-text sm:text-[36px]">186 400 ₸</div>
+              <div className="text-[12px] font-bold uppercase tracking-[.1em] text-muted">{p.confirmed_hours}</div>
+              <div className="mt-2 font-head text-[31px] font-semibold tabular-nums text-text sm:text-[36px]">{Math.floor(confirmedMinutes / 60)} ч {confirmedMinutes % 60} мин</div>
             </div>
             <IconTile icon="wallet" tone="green" />
           </div>
-          <div className="mt-1 text-[12px] text-muted">{p.preliminary}</div>
+          <div className="mt-1 text-[12px] text-muted">По обработанным табелям</div>
           <div className="mt-6">
-            <ProgressBar value={72} label={p.confirmed_hours} />
+            <ProgressBar value={Math.min(100, Math.round(confirmedMinutes / 96))} label={p.confirmed_hours} />
           </div>
           <div className="mt-4 flex items-center justify-between rounded-2xl bg-surface2 px-3.5 py-3 text-[12px]">
-            <span className="text-muted">128 / 176 ч</span>
+            <span className="text-muted">{timecards.length} табелей</span>
             <button type="button" onClick={() => navigate(PLATFORM_ROUTES.income)} className="min-h-8 rounded-lg px-2 font-bold text-green hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
               {p.income} <span aria-hidden="true">→</span>
             </button>

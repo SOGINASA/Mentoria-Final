@@ -52,14 +52,18 @@ export default function PlatformProfilePage() {
   const [panel, setPanel] = useState(null);
   const contactDetails = usePlatformStore((state) => state.contactDetails);
   const updateContactDetails = usePlatformStore((state) => state.updateContactDetails);
+  const createSupportTicket = usePlatformStore((state) => state.createSupportTicket);
+  const hrEnabled = usePlatformStore((state) => state.featureFlags.hr_services);
   const [contactDraft, setContactDraft] = useState(contactDetails);
   const [contactErrors, setContactErrors] = useState({});
 
   const hrItems = [
-    { id: 'documents', to: PLATFORM_ROUTES.documents, icon: 'clipboard', tone: 'green', title: p.documents, subtitle: 'Договоры, справки и расчётные документы' },
-    { id: 'vacation', to: PLATFORM_ROUTES.leave, icon: 'calendar', tone: 'orange', title: p.vacation, subtitle: 'Баланс дней, заявки и статусы' },
-    { id: 'learning', to: PLATFORM_ROUTES.learning, icon: 'book', tone: 'amber', title: p.learning_center, subtitle: 'Курсы, навыки и действующие допуски' },
-    { id: 'support', to: PLATFORM_ROUTES.support, icon: 'helpCircle', tone: 'green', title: p.support, subtitle: 'Вопросы HR, payroll и операционной команде' },
+    ...(hrEnabled ? [
+      { id: 'documents', icon: 'clipboard', tone: 'green', title: p.documents, subtitle: 'Договоры, справки и расчётные документы' },
+      { id: 'vacation', icon: 'calendar', tone: 'orange', title: p.vacation, subtitle: 'Баланс дней, заявки и статусы' },
+      { id: 'learning', icon: 'book', tone: 'amber', title: p.learning_center, subtitle: 'Курсы, навыки и действующие допуски' },
+    ] : []),
+    { id: 'support', icon: 'helpCircle', tone: 'green', title: p.support, subtitle: 'Вопросы HR, payroll и операционной команде' },
   ];
 
   function onLogout() {
@@ -67,19 +71,36 @@ export default function PlatformProfilePage() {
     navigate('/login', { replace: true });
   }
 
-  function saveProfile() {
+  function openHrItem(id) {
+    if (id === 'support') navigate('/app/support');
+    else setPanel(id);
+  }
+
+  async function saveProfile() {
     const errors = {};
     if (contactDraft.phone.replace(/\D/g, '').length < 11) errors.phone = 'Проверьте номер телефона';
     if (!/^\S+@\S+\.\S+$/.test(contactDraft.email)) errors.email = 'Введите корректный email';
     setContactErrors(errors);
     if (Object.keys(errors).length) return;
 
-    updateContactDetails({
-      phone: contactDraft.phone.trim(),
-      email: contactDraft.email.trim(),
-    });
-    setPanel(null);
-    showToast('Контактные данные сохранены');
+    try {
+      await updateContactDetails({
+        phone: contactDraft.phone.trim(),
+        email: contactDraft.email.trim(),
+      });
+      setPanel(null);
+      showToast('Контактные данные сохранены');
+    } catch (error) { showToast(error.message); }
+  }
+
+  async function requestDocument(title) {
+    try {
+      const ticket = await createSupportTicket({
+        category: 'hr',
+        message: `Запрос документа: ${title}`,
+      });
+      showToast(`Запрос ${ticket.id} создан`);
+    } catch (error) { showToast(error.message); }
   }
 
   return (

@@ -13,6 +13,9 @@ from sqlalchemy import inspect as sa_inspect, text
 
 from config import get_config, DATABASE_DIR, UPLOAD_DIR
 from models import db
+# Register the staff-platform tables in the shared SQLAlchemy metadata before
+# create_all/migrations run.  The import is intentionally side-effect only.
+import platform_models  # noqa: F401, E402
 
 migrate = Migrate()
 jwt = JWTManager()
@@ -28,6 +31,13 @@ _SCHEMA_PATCHES = [
     ('write_offs', 'source', "VARCHAR(20) NOT NULL DEFAULT 'manual'"),
     ('write_offs', 'deduct_all', "BOOLEAN NOT NULL DEFAULT 0"),
     ('users', 'employee_id', "INTEGER"),
+    ('stores', 'timezone', "VARCHAR(64) NOT NULL DEFAULT 'Asia/Almaty'"),
+    ('notifications', 'entity_type', "VARCHAR(40)"),
+    ('notifications', 'entity_id', "INTEGER"),
+    ('notifications', 'action_url', "VARCHAR(500)"),
+    ('notifications', 'priority', "VARCHAR(20) NOT NULL DEFAULT 'normal'"),
+    ('notifications', 'read_at', "DATETIME"),
+    ('notifications', 'expires_at', "DATETIME"),
 ]
 
 
@@ -98,14 +108,20 @@ def create_app(config_object=None):
     jwt.init_app(app)
 
     with app.app_context():
-        db.create_all()
-        _ensure_schema()
-        _ensure_sender_employee_links()
+        # Tests own an isolated in-memory schema.  Runtime databases are
+        # upgraded by Alembic in entrypoint.sh; importing the app must not
+        # mutate production schema implicitly.
+        if app.config.get('TESTING'):
+            db.create_all()
+            _ensure_schema()
+            _ensure_sender_employee_links()
 
     # Blueprints
     from routes import (
         auth_bp, stores_bp, writeoffs_bp, uploads_bp, admin_bp,
         notifications_bp, webauthn_bp,
+        platform_bp, shifts_bp, time_tracking_bp, tasks_bp, cases_bp, news_bp,
+        manager_bp, admin_platform_bp,
     )
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(stores_bp, url_prefix='/api/stores')
@@ -114,6 +130,14 @@ def create_app(config_object=None):
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
     app.register_blueprint(webauthn_bp, url_prefix='/api/auth/webauthn')
+    app.register_blueprint(platform_bp, url_prefix='/api/platform')
+    app.register_blueprint(shifts_bp, url_prefix='/api/shifts')
+    app.register_blueprint(time_tracking_bp, url_prefix='/api/time')
+    app.register_blueprint(tasks_bp, url_prefix='/api/tasks')
+    app.register_blueprint(cases_bp, url_prefix='/api/cases')
+    app.register_blueprint(news_bp, url_prefix='/api/news')
+    app.register_blueprint(manager_bp, url_prefix='/api/manager')
+    app.register_blueprint(admin_platform_bp, url_prefix='/api/admin/platform')
 
     _register_misc_routes(app)
     _register_error_handlers(app)

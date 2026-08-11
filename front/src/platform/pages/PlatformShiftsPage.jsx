@@ -53,6 +53,8 @@ export default function PlatformShiftsPage() {
   const user = useAuthStore((s) => s.user);
   const showToast = useUiStore((s) => s.showToast);
   const createShiftRequest = usePlatformStore((state) => state.createShiftRequest);
+  const serverShifts = usePlatformStore((state) => state.shifts);
+  const openShifts = usePlatformStore((state) => state.openShifts);
   const [view, setView] = useState('week');
   const [periodOffset, setPeriodOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(dayKey(addDays(baseDate, 1)));
@@ -65,7 +67,8 @@ export default function PlatformShiftsPage() {
       const days = Array.from({ length: 7 }, (_, index) => {
         const date = addDays(start, index);
         const weekday = (date.getDay() + 6) % 7;
-        return { date, weekday: weekdayNames[weekday], state: [0, 2, 3, 5].includes(index) ? 'shift' : 'off' };
+        const hasShift = serverShifts.some((shift) => dayKey(new Date(shift.starts_at)) === dayKey(date));
+        return { date, weekday: weekdayNames[weekday], state: hasShift ? 'shift' : 'off' };
       });
       return {
         days,
@@ -81,34 +84,38 @@ export default function PlatformShiftsPage() {
       if (index < firstWeekday) return null;
       const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), index - firstWeekday + 1);
       const weekday = (date.getDay() + 6) % 7;
-      return { date, weekday: weekdayNames[weekday], state: weekday < 5 && date.getDate() % 4 !== 0 ? 'shift' : 'off' };
+      const hasShift = serverShifts.some((shift) => dayKey(new Date(shift.starts_at)) === dayKey(date));
+      return { date, weekday: weekdayNames[weekday], state: hasShift ? 'shift' : 'off' };
     });
     return { days, label: monthNames[monthDate.getMonth()].replace(/^./, (letter) => letter.toUpperCase()), year: monthDate.getFullYear() };
-  }, [periodOffset, view]);
+  }, [periodOffset, serverShifts, view]);
 
   const upcoming = useMemo(() => {
-    const today = new Date();
-    return [
-      { id: 1, offset: 0, time: '09:00–18:00' },
-      { id: 2, offset: 1, time: '12:00–21:00' },
-      { id: 3, offset: 2, time: '09:00–18:00' },
-      { id: 4, offset: 4, time: '10:00–19:00' },
-    ].map((shift) => ({
+    const todayKey = dayKey(new Date());
+    return serverShifts.map((shift) => ({
       ...shift,
-      date: fullDateLabel(addDays(today, shift.offset), shift.offset === 0),
-      role: p.role_value,
+      date: fullDateLabel(new Date(shift.starts_at), dayKey(new Date(shift.starts_at)) === todayKey),
+      time: `${new Date(shift.starts_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}–${new Date(shift.ends_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`,
+      role: shift.role_name || p.role_value,
       status: p.published,
       tone: 'green',
     }));
-  }, [p.published, p.role_value]);
+  }, [p.published, p.role_value, serverShifts]);
 
-  const openShift = useMemo(() => ({
-    date: fullDateLabel(addDays(new Date(), 3)),
-    time: '17:00–23:00',
-    store: 'Bahandi • Достык',
-    duration: '6 часов',
-    income: '8 400 ₸',
-  }), []);
+  const openShift = useMemo(() => {
+    const shift = openShifts[0];
+    if (!shift) return { id: null, date: 'Нет доступных смен', time: '—', store: '—', duration: '—', income: 'Предварительно' };
+    const starts = new Date(shift.starts_at);
+    const ends = new Date(shift.ends_at);
+    return {
+      ...shift,
+      date: fullDateLabel(starts, dayKey(starts) === dayKey(new Date())),
+      time: `${starts.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}–${ends.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`,
+      store: shift.store?.name || user?.store?.name || 'Bahandi',
+      duration: `${Math.round((ends - starts) / 3600000)} часов`,
+      income: 'Предварительно',
+    };
+  }, [openShifts, user?.store?.name]);
 
   function changeView(nextView) {
     setView(nextView);
@@ -120,20 +127,24 @@ export default function PlatformShiftsPage() {
     setModal({ type: 'swap', shift });
   }
 
-  function confirmSwap() {
-    createShiftRequest({
-      type: 'swap',
+  async function confirmSwap() {
+    try {
+      await createShiftRequest({
+      type: 'release',
       shiftId: modal?.shift?.id,
       comment: reason.trim(),
-    });
-    setModal(null);
-    showToast(p.swap_requested);
+      });
+      setModal(null);
+      showToast(p.swap_requested);
+    } catch (error) { showToast(error.message); }
   }
 
-  function confirmOpenShift() {
-    createShiftRequest({ type: 'open_shift', shift: openShift });
-    setModal(null);
-    showToast(p.shift_requested);
+  async function confirmOpenShift() {
+    try {
+      await createShiftRequest({ type: 'open_shift', shift: openShift });
+      setModal(null);
+      showToast(p.shift_requested);
+    } catch (error) { showToast(error.message); }
   }
 
   return (
@@ -297,7 +308,7 @@ export default function PlatformShiftsPage() {
                   <div className="mt-1 text-[11px] text-muted">6 часов • вечерняя смена</div>
                 </div>
               </div>
-              <PlatformButton className="mt-5 w-full" icon="plus" onClick={() => setModal({ type: 'openShift' })}>
+              <PlatformButton className="mt-5 w-full" icon="plus" disabled={!openShift.id} onClick={() => setModal({ type: 'openShift' })}>
                 {p.request_shift}
               </PlatformButton>
             </div>
@@ -312,7 +323,7 @@ export default function PlatformShiftsPage() {
                 </p>
               </div>
             </div>
-            <PlatformButton variant="secondary" className="mt-4 w-full" onClick={() => requestSwap(upcoming[0])}>
+            <PlatformButton variant="secondary" className="mt-4 w-full" disabled={!upcoming[0]} onClick={() => requestSwap(upcoming[0])}>
               {p.swap_shift}
             </PlatformButton>
           </PlatformCard>

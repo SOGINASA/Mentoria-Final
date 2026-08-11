@@ -102,6 +102,7 @@ class Store(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
     address = db.Column(db.String(255))
+    timezone = db.Column(db.String(64), nullable=False, default='Asia/Almaty')
     # Идентификатор склада/точки в Iiko (нужен для создания акта списания)
     iiko_store_id = db.Column(db.String(100), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
@@ -116,6 +117,7 @@ class Store(db.Model):
             'id': self.id,
             'name': self.name,
             'address': self.address,
+            'timezone': self.timezone,
             'iiko_store_id': self.iiko_store_id,
             'is_active': self.is_active,
         }
@@ -363,7 +365,13 @@ class Notification(db.Model):
     title = db.Column(db.String(160), nullable=False)
     body = db.Column(db.Text, nullable=True)
     write_off_id = db.Column(db.Integer, db.ForeignKey('write_offs.id'), nullable=True, index=True)
+    entity_type = db.Column(db.String(40), nullable=True, index=True)
+    entity_id = db.Column(db.Integer, nullable=True, index=True)
+    action_url = db.Column(db.String(500), nullable=True)
+    priority = db.Column(db.String(20), nullable=False, default='normal')
     is_read = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    read_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=_now, index=True)
 
     write_off = db.relationship('WriteOff', foreign_keys=[write_off_id])
@@ -377,7 +385,13 @@ class Notification(db.Model):
             'title': self.title,
             'body': self.body,
             'write_off_id': self.write_off_id,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'action_url': self.action_url,
+            'priority': self.priority,
             'is_read': self.is_read,
+            'read_at': _utc_iso(self.read_at),
+            'expires_at': _utc_iso(self.expires_at),
             'created_at': _utc_iso(self.created_at),
             # Короткая сводка по заявке для карточки уведомления
             'write_off': {

@@ -1,53 +1,60 @@
 import { taskProgress, usePlatformStore } from './platformStore';
+import * as platformApi from '../api/platform.api';
+import * as shiftsApi from '../api/shifts.api';
+import * as timeApi from '../api/time.api';
+import * as tasksApi from '../api/tasks.api';
+import * as casesApi from '../api/cases.api';
+import * as newsApi from '../api/news.api';
+
+jest.mock('../api/platform.api');
+jest.mock('../api/shifts.api');
+jest.mock('../api/time.api');
+jest.mock('../api/tasks.api');
+jest.mock('../api/cases.api');
+jest.mock('../api/news.api');
 
 describe('platformStore', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     localStorage.clear();
     usePlatformStore.getState().resetPlatformState();
   });
 
-  test('keeps task progress and completion in sync', () => {
-    const store = usePlatformStore.getState();
-    const openingTask = store.tasks.find((task) => task.id === 1);
-
-    expect(taskProgress(openingTask)).toBe(57);
-
-    openingTask.steps
-      .filter((step) => !step.done)
-      .forEach((step) => usePlatformStore.getState().toggleTaskStep(openingTask.id, step.id));
-
-    const completedTask = usePlatformStore.getState().tasks.find((task) => task.id === 1);
-    expect(taskProgress(completedTask)).toBe(100);
-    expect(completedTask.done).toBe(true);
+  test('calculates task progress from server task shape', () => {
+    expect(taskProgress({ done: false, steps: [{ done: true }, { done: false }] })).toBe(50);
+    expect(taskProgress({ done: true, steps: [] })).toBe(100);
   });
 
-  test('creates persistent support and shift requests with references', () => {
-    const supportTicket = usePlatformStore.getState().createSupportTicket({
-      category: 'schedule',
-      message: 'Не отображается смена',
+  test('hydrates server data as the authoritative snapshot', async () => {
+    platformApi.bootstrap.mockResolvedValue({
+      user: { phone: '+7 700', email: 'employee@bahandi.kz' },
+      shifts: [{ id: 1 }], tasks: [{ id: 2, done: false }],
+      time_tracking: { state: 'clock_in' }, feature_flags: { shifts: true },
+      permissions: ['platform.use'],
     });
-    const shiftRequest = usePlatformStore.getState().createShiftRequest({
-      type: 'swap',
-      shiftId: 12,
-    });
+    shiftsApi.listOpen.mockResolvedValue({ shifts: [{ id: 3 }] });
+    shiftsApi.listRequests.mockResolvedValue({ requests: [] });
+    casesApi.list.mockResolvedValue({ cases: [] });
+    newsApi.list.mockResolvedValue({ news: [] });
+    timeApi.listTimecards.mockResolvedValue({ timecards: [] });
 
-    expect(supportTicket.id).toMatch(/^BH-S-/);
-    expect(shiftRequest.id).toMatch(/^BH-SH-/);
-    expect(usePlatformStore.getState().supportTickets).toHaveLength(1);
-    expect(usePlatformStore.getState().shiftRequests).toHaveLength(1);
-    expect(localStorage.getItem('bahandi_staff_platform')).toContain(supportTicket.id);
+    await usePlatformStore.getState().hydrate();
+    const state = usePlatformStore.getState();
+    expect(state.hydrated).toBe(true);
+    expect(state.shiftActive).toBe(true);
+    expect(state.shifts).toEqual([{ id: 1 }]);
+    expect(state.openShifts).toEqual([{ id: 3 }]);
   });
 
-  test('updates employee contact details', () => {
-    usePlatformStore.getState().updateContactDetails({
-      phone: '+7 700 111 22 33',
-      email: 'test@bahandi.kz',
+  test('persists a support case returned by backend', async () => {
+    casesApi.create.mockResolvedValue({
+      case: { id: 7, reference: 'BH-S-000007', category: 'schedule' },
     });
-
-    expect(usePlatformStore.getState().contactDetails).toEqual({
-      phone: '+7 700 111 22 33',
-      email: 'test@bahandi.kz',
+    const result = await usePlatformStore.getState().createSupportTicket({
+      category: 'schedule', message: 'Не отображается смена',
     });
+    expect(result.id).toBe('BH-S-000007');
+    expect(usePlatformStore.getState().supportTickets[0].reference).toBe('BH-S-000007');
   });
 
   test('persists learning progress without duplicating completed modules', () => {

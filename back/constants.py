@@ -3,9 +3,22 @@
 
 # Роли пользователей
 ROLE_SENDER = 'sender'        # Отправитель (сотрудник торговой точки)
+ROLE_MANAGER = 'manager'      # Менеджер торговой точки
 ROLE_REVIEWER = 'reviewer'    # Проверяющий
+ROLE_HR = 'hr'                # HR / кадровые сервисы
+ROLE_FINANCE = 'finance'      # Финансы / payroll
+ROLE_OPERATIONS = 'operations'  # Операционный офис
 ROLE_ADMIN = 'admin'          # Администратор (справочники, пользователи)
-ROLES = {ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN}
+ROLES = {
+    ROLE_SENDER, ROLE_MANAGER, ROLE_REVIEWER, ROLE_HR,
+    ROLE_FINANCE, ROLE_OPERATIONS, ROLE_ADMIN,
+}
+
+# Store-scopes пользователя. Роль задаёт тип полномочий, scope — конкретные точки.
+SCOPE_EMPLOYEE = 'employee'
+SCOPE_MANAGER = 'manager'
+SCOPE_SUPERVISOR = 'supervisor'
+STORE_SCOPES = {SCOPE_EMPLOYEE, SCOPE_MANAGER, SCOPE_SUPERVISOR}
 
 # Статусы заявки на списание
 STATUS_DRAFT = 'draft'        # Черновик (авто-создан по падению, ждёт подтверждения сотрудником)

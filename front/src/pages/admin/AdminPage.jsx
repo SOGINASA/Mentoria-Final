@@ -9,13 +9,20 @@ import { useUiStore } from '../../store/uiStore';
 import * as adminApi from '../../api/admin.api';
 import { listUsers, listStores, listEmployees } from '../../api/admin.api';
 import { initials } from '../../utils/format';
-import { ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN } from '../../constants/roles';
+import {
+  ROLE_SENDER, ROLE_MANAGER, ROLE_REVIEWER, ROLE_HR, ROLE_FINANCE,
+  ROLE_OPERATIONS, ROLE_ADMIN,
+} from '../../constants/roles';
 import AdminAnalytics from './AdminAnalytics';
 
 const ROLE_BADGE = {
   [ROLE_ADMIN]: { bg: 'var(--orange-tint)', fg: 'var(--orange)' },
   [ROLE_REVIEWER]: { bg: 'var(--green-tint)', fg: 'var(--green)' },
   [ROLE_SENDER]: { bg: 'var(--surface2)', fg: 'var(--muted)' },
+  [ROLE_MANAGER]: { bg: 'var(--green-tint)', fg: 'var(--green)' },
+  [ROLE_HR]: { bg: 'var(--surface2)', fg: 'var(--text)' },
+  [ROLE_FINANCE]: { bg: 'var(--orange-tint)', fg: 'var(--orange)' },
+  [ROLE_OPERATIONS]: { bg: 'var(--green-tint)', fg: 'var(--green)' },
 };
 
 export default function AdminPage() {
@@ -29,7 +36,12 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [sheet, setSheet] = useState(null); // { mode, entity }
 
-  const roleLabel = (r) => (r === ROLE_REVIEWER ? t.role_reviewer : r === ROLE_ADMIN ? t.role_admin : t.role_sender);
+  const roleLabel = (r) => ({
+    [ROLE_SENDER]: t.role_sender, [ROLE_MANAGER]: 'Менеджер',
+    [ROLE_REVIEWER]: t.role_reviewer, [ROLE_HR]: 'HR',
+    [ROLE_FINANCE]: 'Финансы', [ROLE_OPERATIONS]: 'Операции',
+    [ROLE_ADMIN]: t.role_admin,
+  }[r] || r);
 
   const loadStores = useCallback(async () => {
     const d = await listStores();
@@ -414,13 +426,17 @@ function Field({ label, value, onChange, type = 'text', hint }) {
 function RoleChips({ value, onChange, t }) {
   const roles = [
     { key: ROLE_SENDER, label: t.role_sender },
+    { key: ROLE_MANAGER, label: 'Менеджер' },
     { key: ROLE_REVIEWER, label: t.role_reviewer },
+    { key: ROLE_HR, label: 'HR' },
+    { key: ROLE_FINANCE, label: 'Финансы' },
+    { key: ROLE_OPERATIONS, label: 'Операции' },
     { key: ROLE_ADMIN, label: t.role_admin },
   ];
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[12.5px] font-semibold text-text">{t.f_role}</span>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {roles.map((r) => {
           const active = value === r.key;
           const c = ROLE_BADGE[r.key];

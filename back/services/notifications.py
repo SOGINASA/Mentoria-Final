@@ -6,10 +6,13 @@ from models import db, User, Notification
 from constants import ROLE_REVIEWER, ROLE_ADMIN
 
 
-def notify(user_id, kind, title, body=None, write_off_id=None, commit=True):
+def notify(user_id, kind, title, body=None, write_off_id=None, commit=True,
+           entity_type=None, entity_id=None, action_url=None, priority='normal'):
     """Создать одно уведомление для пользователя."""
     n = Notification(
         user_id=user_id, kind=kind, title=title, body=body, write_off_id=write_off_id,
+        entity_type=entity_type, entity_id=entity_id, action_url=action_url,
+        priority=priority,
     )
     db.session.add(n)
     if commit:

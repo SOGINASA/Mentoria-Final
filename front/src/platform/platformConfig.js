@@ -38,11 +38,11 @@ export function getPlatformBackRoute(pathname) {
   return PLATFORM_ROUTES.home;
 }
 
-export function createPlatformNavigation(copy, pendingTaskCount = 0) {
+export function createPlatformNavigation(copy, pendingTaskCount = 0, flags = {}) {
   return [
     { to: PLATFORM_ROUTES.home, end: true, icon: 'home', label: copy.today },
     { to: PLATFORM_ROUTES.shifts, icon: 'calendar', label: copy.shifts },
-    { to: PLATFORM_ROUTES.income, icon: 'wallet', label: copy.income },
+    ...(flags.income === false ? [] : [{ to: PLATFORM_ROUTES.income, icon: 'wallet', label: copy.income }]),
     {
       to: PLATFORM_ROUTES.tasks,
       icon: 'clipboard',

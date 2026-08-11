@@ -2,7 +2,9 @@
 
 Базовый префикс: `/api`. Авторизация — JWT в заголовке `Authorization: Bearer <access_token>`.
 
-Роли: `sender` (отправитель), `reviewer` (проверяющий), `admin`. Админ имеет доступ ко всему.
+Роли: `sender`, `manager`, `reviewer`, `hr`, `finance`, `operations`, `admin`.
+Администратор имеет доступ ко всему; остальные права и точки возвращаются как
+`permissions` и `scopes`.
 
 ---
 
@@ -23,7 +25,7 @@
 `{ "access_token": "..." }`
 
 ### GET `/me`
-`{ "user": { ... } }`
+`{ "user": { ... }, "permissions": [...], "scopes": {...}, "feature_flags": {...} }`
 
 ### POST `/change-password`
 `{ "current_password": "...", "new_password": "..." }`
@@ -147,7 +149,7 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 
 ---
 
-## Демо-логины (после `flask init-db`)
+## Демо-логины (после `flask db upgrade` и `flask seed`)
 
 | Логин | Пароль | Роль |
 |-------|--------|------|
@@ -155,3 +157,57 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 | reviewer | reviewer123 | reviewer |
 | sender1 | sender123 | sender (Точка №1) |
 | sender2 | sender123 | sender (Точка №2) |
+# Staff Platform API (Workday MVP)
+
+Все маршруты ниже используют JWT access token. Время передаётся в ISO 8601 и
+возвращается в UTC с суффиксом `Z`.
+
+## Bootstrap и профиль
+
+- `GET /api/platform/bootstrap` — пользователь, permissions, store scopes,
+  feature flags, ближайшие смены, активные задачи и текущее состояние отметок.
+- `PATCH /api/platform/profile` — изменение только `full_name`, `email`, `phone`.
+- `GET /api/auth/me` — пользователь вместе с permissions/scopes/feature flags.
+
+## Смены
+
+- `GET /api/shifts?from=&to=` — назначенные опубликованные смены.
+- `GET /api/shifts?open=1` — доступные открытые смены.
+- `GET /api/shifts/requests`, `POST /api/shifts/{id}/requests` — запросы
+  сотрудника (`open_shift`, `release`, `swap`).
+- `POST /api/shifts/manager`, `PATCH /api/shifts/manager/{id}` — создание и
+  изменение смены менеджером.
+- `POST /api/shifts/manager/{id}/assignments`,
+  `POST /api/shifts/manager/{id}/publish` — назначение и публикация.
+- `GET /api/shifts/manager/requests`,
+  `POST /api/shifts/manager/requests/{id}/decision` — очередь решений.
+
+## Учёт времени
+
+- `GET /api/time/current` — состояние и допустимые следующие действия.
+- `POST /api/time/events` — `clock_in`, `break_start`, `break_end`, `clock_out`.
+  Заголовок `Idempotency-Key` обязателен.
+- `GET /api/time/events`, `GET /api/time/timecards` — собственная история.
+- `POST /api/time/timecards/{id}/corrections` — запрос корректировки.
+- `GET /api/time/manager/timecards`,
+  `POST /api/time/manager/timecards/{id}/decision` — подтверждение табеля.
+- `GET /api/time/manager/corrections`,
+  `POST /api/time/manager/corrections/{id}/decision` — решения по корректировкам.
+
+## Задачи, обращения, новости
+
+- `GET /api/tasks`, `PATCH /api/tasks/{id}/steps/{step_id}`,
+  `POST /api/tasks/{id}/complete|reopen` — задачи сотрудника.
+- `/api/tasks/manager...` — шаблоны, назначение и проверка менеджером.
+- `GET|POST /api/cases`, `POST /api/cases/{id}/messages` — обращения.
+- `GET /api/news`, `POST /api/news/{id}/read` — новости и отметка прочтения.
+- `GET /api/manager/today` — единая очередь смен, табелей, корректировок и задач.
+
+## Администрирование платформы
+
+- `PUT /api/admin/platform/users/{id}/scopes` — store scopes.
+- `GET|PUT /api/admin/platform/feature-flags[/<key>]` — feature flags и targets.
+- `GET /api/admin/platform/audit` — append-only audit feed.
+
+Изменяющие state machine endpoints принимают поле `version`; при устаревшей
+версии возвращается `409 Conflict`.

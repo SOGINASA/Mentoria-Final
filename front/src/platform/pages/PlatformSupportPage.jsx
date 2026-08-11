@@ -17,16 +17,20 @@ export default function PlatformSupportPage() {
   const [error, setError] = useState('');
   const [sentTicket, setSentTicket] = useState(null);
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
     if (message.trim().length < 10) {
       setError('Опишите вопрос подробнее — минимум 10 символов.');
       return;
     }
     setError('');
-    const ticket = createSupportTicket({ category, message: message.trim() });
-    setSentTicket(ticket);
-    showToast('Обращение создано');
+    try {
+      const ticket = await createSupportTicket({ category, message: message.trim() });
+      setSentTicket(ticket);
+      showToast('Обращение создано');
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   }
 
   if (sentTicket) {

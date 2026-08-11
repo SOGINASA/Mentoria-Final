@@ -22,6 +22,8 @@ def list_notifications():
     page, per_page. Непрочитанные и более новые — выше."""
     user = get_current_user()
     query = Notification.query.filter(Notification.user_id == user.id)
+    query = query.filter(db.or_(Notification.expires_at.is_(None),
+                                Notification.expires_at > datetime.now(timezone.utc)))
 
     if request.args.get('unread') in ('1', 'true', 'yes'):
         query = query.filter(Notification.is_read.is_(False))
@@ -61,6 +63,7 @@ def mark_read(notif_id):
     if not n or n.user_id != user.id:
         return jsonify({'error': 'Уведомление не найдено'}), 404
     n.is_read = True
+    n.read_at = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify({'notification': n.to_dict()})
 
@@ -71,7 +74,8 @@ def mark_all_read():
     """Отметить все уведомления пользователя прочитанными."""
     user = get_current_user()
     updated = Notification.query.filter_by(user_id=user.id, is_read=False).update(
-        {Notification.is_read: True}, synchronize_session=False
+        {Notification.is_read: True, Notification.read_at: datetime.now(timezone.utc)},
+        synchronize_session=False
     )
     db.session.commit()
     return jsonify({'updated': updated})

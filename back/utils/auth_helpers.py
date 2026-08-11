@@ -39,3 +39,21 @@ def role_required(*roles):
             return fn(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def permission_required(permission):
+    """Require a staff-platform permission; administrators always pass."""
+    from services.permissions import has_permission
+
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            verify_jwt_in_request()
+            user = get_current_user()
+            if not user or not user.is_active:
+                return jsonify({'error': 'Пользователь не найден или деактивирован'}), 401
+            if not has_permission(user, permission):
+                return jsonify({'error': 'Недостаточно прав', 'permission': permission}), 403
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
