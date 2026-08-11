@@ -21,15 +21,19 @@ export default function PlatformDocumentsPage() {
     document.title.toLowerCase().includes(query.trim().toLowerCase())
   )), [query]);
 
-  function requestDocument(document) {
+  async function requestDocument(document) {
     const existing = requests.find((request) => request.documentId === document.id && request.status === 'processing');
     if (existing) {
       showToast(`Заявка ${existing.id} уже обрабатывается`);
       return;
     }
-    const request = createDocumentRequest({ documentId: document.id, title: document.title });
-    setSelected(null);
-    showToast(`Заявка ${request.id} создана`);
+    try {
+      const request = await createDocumentRequest({ documentId: document.id, title: document.title });
+      setSelected(null);
+      showToast(`Заявка ${request.id} создана`);
+    } catch (error) {
+      showToast(error.message);
+    }
   }
 
   return (

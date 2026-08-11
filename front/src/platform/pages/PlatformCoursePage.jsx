@@ -35,31 +35,38 @@ export default function PlatformCoursePage() {
   const completed = completedIds.includes(activeModule.id);
   const isLastModule = activeIndex === course.modules.length - 1;
 
-  function finishModule() {
-    if (!completed) completeLearningModule(course.id, activeModule.id);
-    const nextModule = course.modules[activeIndex + 1];
-    if (nextModule) {
-      setActiveModuleId(nextModule.id);
-      showToast('Урок завершён, открыт следующий');
-    } else {
-      setAssessmentOpen(true);
+  async function finishModule() {
+    try {
+      if (!completed) await completeLearningModule(course.id, activeModule.id);
+      const nextModule = course.modules[activeIndex + 1];
+      if (nextModule) {
+        setActiveModuleId(nextModule.id);
+        showToast('Урок завершён, открыт следующий');
+      } else {
+        setAssessmentOpen(true);
+      }
+    } catch (error) {
+      showToast(error.message);
     }
   }
 
-  function submitAssessment() {
+  async function submitAssessment() {
     if (!answer) {
       setAssessmentError('Выберите один вариант ответа');
       return;
     }
-    if (answer !== course.assessment.correctOptionId) {
-      completeLearningAssessment(course.id, 0);
-      setAssessmentError('Ответ неверный. Вернитесь к материалу и попробуйте ещё раз.');
-      return;
+    try {
+      const result = await completeLearningAssessment(course.id, answer);
+      if (!result.assessmentPassed) {
+        setAssessmentError('Ответ неверный. Вернитесь к материалу и попробуйте ещё раз.');
+        return;
+      }
+      setAssessmentError('');
+      setAssessmentOpen(false);
+      showToast('Проверка пройдена — курс завершён');
+    } catch (error) {
+      setAssessmentError(error.message);
     }
-    completeLearningAssessment(course.id, 100);
-    setAssessmentError('');
-    setAssessmentOpen(false);
-    showToast('Проверка пройдена — курс завершён');
   }
 
   return (

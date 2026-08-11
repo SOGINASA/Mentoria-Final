@@ -6,6 +6,7 @@ import * as timeApi from '../api/time.api';
 import * as tasksApi from '../api/tasks.api';
 import * as casesApi from '../api/cases.api';
 import * as newsApi from '../api/news.api';
+import * as employeeServicesApi from '../api/employeeServices.api';
 
 function taskProgress(task) {
   if (task.done) return 100;
@@ -20,9 +21,50 @@ function idempotencyKey() {
   return `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function localReference(prefix) {
-  const timePart = Date.now().toString(36).slice(-5).toUpperCase();
-  return `${prefix}-${timePart}`;
+const LEAVE_TYPE_LABELS = {
+  annual: 'Ежегодный оплачиваемый отпуск',
+  unpaid: 'Отпуск без сохранения зарплаты',
+  sick: 'Больничный',
+  other: 'Другое отсутствие',
+};
+
+function normalizeLearningProgress(items = []) {
+  return Object.fromEntries(items.map((item) => [item.course_id, {
+    completedModuleIds: item.completed_module_ids || [],
+    assessmentScore: item.assessment_score,
+    assessmentPassed: Boolean(item.assessment_passed),
+    completedAt: item.completed_at,
+    updatedAt: item.updated_at,
+  }]));
+}
+
+function normalizeDocumentRequest(item) {
+  return {
+    id: item.reference,
+    requestId: item.request_id,
+    documentId: item.document_id,
+    title: item.title,
+    status: item.status,
+    fileUrl: item.file_url,
+    version: item.version,
+    createdAt: item.created_at,
+  };
+}
+
+function normalizeLeaveRequest(item) {
+  return {
+    id: item.reference,
+    requestId: item.request_id,
+    type: item.leave_type,
+    typeLabel: LEAVE_TYPE_LABELS[item.leave_type] || item.leave_type,
+    startDate: item.starts_on,
+    endDate: item.ends_on,
+    days: item.days,
+    comment: item.comment || '',
+    status: item.status,
+    version: item.version,
+    createdAt: item.created_at,
+  };
 }
 
 const initialState = {
@@ -38,19 +80,14 @@ const initialState = {
   supportTickets: [],
   learningProgress: {},
   documentRequests: [],
-  leaveRequests: [
-    {
-      id: 'BH-L-2409',
-      type: 'annual',
-      typeLabel: 'Ежегодный оплачиваемый отпуск',
-      startDate: '2026-09-02',
-      endDate: '2026-09-08',
-      days: 7,
-      comment: '',
-      createdAt: '2026-07-18T09:30:00+06:00',
-      status: 'approved',
-    },
-  ],
+  leaveRequests: [],
+  leaveBalance: {
+    annual_allowance_days: 0,
+    external_used_days: 0,
+    approved_days: 0,
+    available_days: 0,
+    preliminary: true,
+  },
   news: [],
   timecards: [],
   featureFlags: {
@@ -82,6 +119,7 @@ export const usePlatformStore = create(
             timeApi.listTimecards(),
           ]);
           const state = bootstrap.time_tracking?.state || 'idle';
+          const employeeServices = bootstrap.employee_services || {};
           set({
             hydrated: true,
             loading: false,
@@ -98,6 +136,10 @@ export const usePlatformStore = create(
               phone: bootstrap.user?.phone || '',
               email: bootstrap.user?.email || '',
             },
+            learningProgress: normalizeLearningProgress(employeeServices.learning_progress),
+            documentRequests: (employeeServices.document_requests || []).map(normalizeDocumentRequest),
+            leaveRequests: (employeeServices.leave_requests || []).map(normalizeLeaveRequest),
+            leaveBalance: employeeServices.leave_balance || initialState.leaveBalance,
             timeState: state,
             shiftActive: state !== 'idle',
           });
@@ -203,72 +245,57 @@ export const usePlatformStore = create(
           ? { ...post, is_read: true } : post) }));
       },
 
-      completeLearningModule(courseId, moduleId) {
-        set((state) => {
-          const current = state.learningProgress[courseId] || { completedModuleIds: [] };
-          if (current.completedModuleIds.includes(moduleId)) return state;
-          return {
-            learningProgress: {
-              ...state.learningProgress,
-              [courseId]: {
-                ...current,
-                completedModuleIds: [...current.completedModuleIds, moduleId],
-                updatedAt: new Date().toISOString(),
-              },
-            },
-          };
-        });
+      async completeLearningModule(courseId, moduleId) {
+        const result = await employeeServicesApi.completeModule(courseId, moduleId);
+        const normalized = normalizeLearningProgress([result.progress]);
+        set((state) => ({ learningProgress: { ...state.learningProgress, ...normalized } }));
+        return normalized[courseId];
       },
 
-      completeLearningAssessment(courseId, score) {
-        set((state) => {
-          const current = state.learningProgress[courseId] || { completedModuleIds: [] };
-          const passed = score >= 80;
-          return {
-            learningProgress: {
-              ...state.learningProgress,
-              [courseId]: {
-                ...current,
-                assessmentPassed: passed,
-                assessmentScore: score,
-                completedAt: passed ? new Date().toISOString() : current.completedAt,
-                updatedAt: new Date().toISOString(),
-              },
-            },
-          };
-        });
+      async completeLearningAssessment(courseId, answer) {
+        const result = await employeeServicesApi.completeAssessment(courseId, answer);
+        const normalized = normalizeLearningProgress([result.progress]);
+        set((state) => ({ learningProgress: { ...state.learningProgress, ...normalized } }));
+        return normalized[courseId];
       },
 
-      createDocumentRequest(payload) {
-        const request = {
-          ...payload,
-          id: localReference('BH-D'),
-          createdAt: new Date().toISOString(),
-          status: 'processing',
-        };
-        set((state) => ({ documentRequests: [request, ...state.documentRequests] }));
+      async createDocumentRequest(payload) {
+        const result = await employeeServicesApi.createDocumentRequest(payload.documentId);
+        const request = normalizeDocumentRequest(result.request);
+        set((state) => ({ documentRequests: [request, ...state.documentRequests
+          .filter((item) => item.requestId !== request.requestId)] }));
         return request;
       },
 
-      createLeaveRequest(payload) {
-        const request = {
-          ...payload,
-          id: localReference('BH-L'),
-          createdAt: new Date().toISOString(),
-          status: 'pending',
-        };
-        set((state) => ({ leaveRequests: [request, ...state.leaveRequests] }));
-        return request;
-      },
-
-      cancelLeaveRequest(requestId) {
+      async createLeaveRequest(payload) {
+        const result = await employeeServicesApi.createLeaveRequest({
+          leave_type: payload.type,
+          starts_on: payload.startDate,
+          ends_on: payload.endDate,
+          comment: payload.comment,
+        });
+        const request = normalizeLeaveRequest(result.request);
         set((state) => ({
-          leaveRequests: state.leaveRequests.map((request) => (
-            request.id === requestId && request.status === 'pending'
-              ? { ...request, status: 'cancelled' }
-              : request
-          )),
+          leaveRequests: [request, ...state.leaveRequests],
+          leaveBalance: result.leave_balance || state.leaveBalance,
         }));
+        return request;
+      },
+
+      async cancelLeaveRequest(requestId) {
+        const current = get().leaveRequests.find((item) => item.id === requestId);
+        if (!current) return null;
+        const result = await employeeServicesApi.cancelLeaveRequest(
+          current.requestId, current.version,
+        );
+        const request = normalizeLeaveRequest(result.request);
+        set((state) => ({
+          leaveRequests: state.leaveRequests.map((item) => (
+            item.requestId === request.requestId ? request : item
+          )),
+          leaveBalance: result.leave_balance || state.leaveBalance,
+        }));
+        return request;
       },
 
       resetPlatformState() {
@@ -287,6 +314,7 @@ export const usePlatformStore = create(
         learningProgress: state.learningProgress,
         documentRequests: state.documentRequests,
         leaveRequests: state.leaveRequests,
+        leaveBalance: state.leaveBalance,
       }),
     },
   ),

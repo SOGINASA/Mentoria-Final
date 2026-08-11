@@ -9,6 +9,7 @@ from models import db, Notification
 from platform_models import PlatformTask, Shift, ShiftAssignment, TimeEvent
 from services.audit import audit
 from services.feature_flags import flags_for_user
+from services.employee_services import employee_services_payload
 from services.permissions import permissions_for_user, scope_payload
 from utils.auth_helpers import get_current_user
 from utils.platform_helpers import utcnow
@@ -53,6 +54,7 @@ def bootstrap():
             'last_event': last_event.to_dict() if last_event else None,
         },
         'unread_notifications': Notification.query.filter_by(user_id=user.id, is_read=False).count(),
+        'employee_services': employee_services_payload(user),
     })
     return jsonify(payload)
 

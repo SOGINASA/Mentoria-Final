@@ -165,7 +165,8 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 ## Bootstrap и профиль
 
 - `GET /api/platform/bootstrap` — пользователь, permissions, store scopes,
-  feature flags, ближайшие смены, активные задачи и текущее состояние отметок.
+  feature flags, ближайшие смены, активные задачи, текущее состояние отметок и
+  server-backed snapshot сервисов сотрудника.
 - `PATCH /api/platform/profile` — изменение только `full_name`, `email`, `phone`.
 - `GET /api/auth/me` — пользователь вместе с permissions/scopes/feature flags.
 
@@ -202,6 +203,31 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 - `GET|POST /api/cases`, `POST /api/cases/{id}/messages` — обращения.
 - `GET /api/news`, `POST /api/news/{id}/read` — новости и отметка прочтения.
 - `GET /api/manager/today` — единая очередь смен, табелей, корректировок и задач.
+
+## Сервисы сотрудника
+
+- `GET /api/employee-services` — прогресс обучения, запросы документов, заявки
+  на отсутствие и предварительный баланс отпуска. Тот же snapshot вложен в
+  `employee_services` ответа `/api/platform/bootstrap`.
+- `POST /api/employee-services/learning/{course_id}/modules/{module_id}/complete`
+  — идемпотентная отметка урока.
+- `POST /api/employee-services/learning/{course_id}/assessment` с
+  `{ "answer": "a" }` — серверная проверка ответа после всех уроков.
+- `POST /api/employee-services/documents/requests` с `document_id` — запрос
+  кадрового документа; повторный активный запрос возвращается с
+  `duplicate=true`.
+- `POST /api/employee-services/leave/requests` — заявка с `leave_type`,
+  `starts_on`, `ends_on`, `comment`; пересечения и доступный баланс проверяются
+  на сервере.
+- `POST /api/employee-services/leave/requests/{id}/cancel` — отмена собственной
+  заявки только в состоянии `pending`.
+- `/api/employee-services/manager/documents/requests...` и
+  `/api/employee-services/manager/leave/requests...` — scoped-очереди и решения
+  менеджера/HR с optimistic `version`, audit и уведомлением сотрудника.
+
+`leave_balance.preliminary=true` обязателен до подключения официальной
+HR-системы. `ANNUAL_LEAVE_ALLOWANCE_DAYS` и `ANNUAL_LEAVE_USED_DAYS` — временные
+конфигурационные значения; API не выдаёт их за официальный кадровый расчёт.
 
 ## Администрирование платформы
 

@@ -9,6 +9,7 @@ export default function PlatformServicesPage() {
   const learningProgress = usePlatformStore((state) => state.learningProgress);
   const documentRequests = usePlatformStore((state) => state.documentRequests);
   const leaveRequests = usePlatformStore((state) => state.leaveRequests);
+  const leaveBalance = usePlatformStore((state) => state.leaveBalance);
   const completedCourses = LEARNING_COURSES.filter((course) => (
     learningProgress[course.id]?.completedModuleIds?.length === course.modules.length
       && learningProgress[course.id]?.assessmentPassed
@@ -34,8 +35,8 @@ export default function PlatformServicesPage() {
         </PlatformCard>
         <PlatformCard className="p-4 sm:p-5">
           <div className="text-[11px] font-bold uppercase tracking-[.1em] text-muted">Отпуск</div>
-          <div className="mt-2 font-head text-[27px] font-semibold text-text">12 дней</div>
-          <div className="mt-1 text-[12px] text-muted">доступно в 2026 году</div>
+          <div className="mt-2 font-head text-[27px] font-semibold text-text">{leaveBalance.available_days} дней</div>
+          <div className="mt-1 text-[12px] text-muted">доступно{leaveBalance.preliminary ? ' предварительно' : ''}</div>
         </PlatformCard>
         <PlatformCard className="p-4 sm:p-5">
           <div className="text-[11px] font-bold uppercase tracking-[.1em] text-muted">Заявки</div>

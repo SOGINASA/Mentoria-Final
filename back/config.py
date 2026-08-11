@@ -62,6 +62,11 @@ class Config:
     # значение). Меняется через env без правки кода.
     ANALYTICS_AVG_LOSS = int(os.environ.get('ANALYTICS_AVG_LOSS', '1500'))
 
+    # Предварительный баланс до подключения официальной HR-системы. API всегда
+    # возвращает preliminary=true, чтобы клиент не показывал его как расчёт HR.
+    ANNUAL_LEAVE_ALLOWANCE_DAYS = int(os.environ.get('ANNUAL_LEAVE_ALLOWANCE_DAYS', '24'))
+    ANNUAL_LEAVE_USED_DAYS = int(os.environ.get('ANNUAL_LEAVE_USED_DAYS', '0'))
+
     # ── Биометрия / WebAuthn (Face ID, Touch ID, отпечаток, passkey) ───────
     # RP_ID — домен сайта без схемы и порта (для localhost оставить 'localhost').
     # ORIGIN — полный источник фронтенда (схема+домен+порт), должен совпадать с

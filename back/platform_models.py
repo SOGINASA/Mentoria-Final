@@ -395,3 +395,119 @@ class NewsRead(db.Model):
     read_at = db.Column(db.DateTime, default=_now, nullable=False)
 
     __table_args__ = (db.UniqueConstraint('post_id', 'user_id', name='uq_news_read'),)
+
+
+class LearningProgress(db.Model):
+    """Server-owned progress for the static employee learning catalog."""
+
+    __tablename__ = 'learning_progress'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    course_id = db.Column(db.String(80), nullable=False, index=True)
+    completed_module_ids = db.Column(db.JSON, nullable=False, default=list)
+    assessment_score = db.Column(db.Integer)
+    assessment_passed = db.Column(db.Boolean, nullable=False, default=False)
+    completed_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=_now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'course_id', name='uq_learning_progress_user_course'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'course_id': self.course_id,
+            'completed_module_ids': self.completed_module_ids or [],
+            'assessment_score': self.assessment_score,
+            'assessment_passed': self.assessment_passed,
+            'completed_at': _utc_iso(self.completed_at),
+            'updated_at': _utc_iso(self.updated_at),
+        }
+
+
+class EmployeeDocumentRequest(db.Model):
+    """Request for an HR document; no document is fabricated by this service."""
+
+    __tablename__ = 'employee_document_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    reference = db.Column(db.String(32), unique=True, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    store_id = db.Column(db.Integer, db.ForeignKey('stores.id'), nullable=True, index=True)
+    document_id = db.Column(db.String(80), nullable=False, index=True)
+    title = db.Column(db.String(180), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='processing', index=True)
+    file_url = db.Column(db.String(500))
+    decision_reason = db.Column(db.Text)
+    decided_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    decided_at = db.Column(db.DateTime)
+    version = db.Column(db.Integer, nullable=False, default=1)
+    created_at = db.Column(db.DateTime, default=_now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now, nullable=False)
+
+    def to_dict(self):
+        return {
+            'request_id': self.id,
+            'reference': self.reference,
+            'user_id': self.user_id,
+            'store_id': self.store_id,
+            'document_id': self.document_id,
+            'title': self.title,
+            'status': self.status,
+            'file_url': self.file_url,
+            'decision_reason': self.decision_reason,
+            'decided_by_id': self.decided_by_id,
+            'decided_at': _utc_iso(self.decided_at),
+            'version': self.version,
+            'created_at': _utc_iso(self.created_at),
+            'updated_at': _utc_iso(self.updated_at),
+        }
+
+
+class LeaveRequest(db.Model):
+    """Employee absence request with an explicit approval state machine."""
+
+    __tablename__ = 'leave_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    reference = db.Column(db.String(32), unique=True, nullable=False, index=True)
+    requester_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
+                             nullable=False, index=True)
+    store_id = db.Column(db.Integer, db.ForeignKey('stores.id'), nullable=True, index=True)
+    leave_type = db.Column(db.String(24), nullable=False, index=True)
+    starts_on = db.Column(db.Date, nullable=False, index=True)
+    ends_on = db.Column(db.Date, nullable=False, index=True)
+    days = db.Column(db.Integer, nullable=False)
+    comment = db.Column(db.Text)
+    status = db.Column(db.String(20), nullable=False, default='pending', index=True)
+    decision_reason = db.Column(db.Text)
+    decided_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    decided_at = db.Column(db.DateTime)
+    version = db.Column(db.Integer, nullable=False, default=1)
+    created_at = db.Column(db.DateTime, default=_now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now, nullable=False)
+
+    def to_dict(self):
+        return {
+            'request_id': self.id,
+            'reference': self.reference,
+            'requester_id': self.requester_id,
+            'store_id': self.store_id,
+            'leave_type': self.leave_type,
+            'starts_on': self.starts_on.isoformat(),
+            'ends_on': self.ends_on.isoformat(),
+            'days': self.days,
+            'comment': self.comment,
+            'status': self.status,
+            'decision_reason': self.decision_reason,
+            'decided_by_id': self.decided_by_id,
+            'decided_at': _utc_iso(self.decided_at),
+            'version': self.version,
+            'created_at': _utc_iso(self.created_at),
+            'updated_at': _utc_iso(self.updated_at),
+        }

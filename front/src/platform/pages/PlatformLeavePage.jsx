@@ -37,22 +37,21 @@ export default function PlatformLeavePage() {
   const leaveRequests = usePlatformStore((state) => state.leaveRequests);
   const createLeaveRequest = usePlatformStore((state) => state.createLeaveRequest);
   const cancelLeaveRequest = usePlatformStore((state) => state.cancelLeaveRequest);
+  const leaveBalance = usePlatformStore((state) => state.leaveBalance);
   const [form, setForm] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState({});
   const [cancelTarget, setCancelTarget] = useState(null);
   const days = inclusiveDays(form.startDate, form.endDate);
   const today = localInputDate();
   const approvedDays = useMemo(() => leaveRequests.filter((request) => request.status === 'approved' && request.type === 'annual').reduce((sum, request) => sum + request.days, 0), [leaveRequests]);
-  const annualAllowance = 24;
-  const usedDays = 5;
-  const availableDays = Math.max(0, annualAllowance - usedDays - approvedDays);
+  const availableDays = leaveBalance.available_days;
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: null }));
   }
 
-  function submitRequest(event) {
+  async function submitRequest(event) {
     event.preventDefault();
     const nextErrors = {};
     if (!form.startDate) nextErrors.startDate = 'Выберите дату начала';
@@ -66,15 +65,23 @@ export default function PlatformLeavePage() {
     }
 
     const selectedType = LEAVE_TYPES.find((item) => item.id === form.type);
-    const request = createLeaveRequest({ ...form, typeLabel: selectedType.label, days });
-    setForm(INITIAL_FORM);
-    showToast(`Заявка ${request.id} отправлена`);
+    try {
+      const request = await createLeaveRequest({ ...form, typeLabel: selectedType.label, days });
+      setForm(INITIAL_FORM);
+      showToast(`Заявка ${request.id} отправлена`);
+    } catch (error) {
+      showToast(error.message);
+    }
   }
 
-  function confirmCancellation() {
-    cancelLeaveRequest(cancelTarget.id);
-    showToast(`Заявка ${cancelTarget.id} отменена`);
-    setCancelTarget(null);
+  async function confirmCancellation() {
+    try {
+      await cancelLeaveRequest(cancelTarget.id);
+      showToast(`Заявка ${cancelTarget.id} отменена`);
+      setCancelTarget(null);
+    } catch (error) {
+      showToast(error.message);
+    }
   }
 
   return (
@@ -85,7 +92,7 @@ export default function PlatformLeavePage() {
         <PlatformCard variant="orangeTint" className="p-5">
           <div className="text-[11px] font-bold uppercase tracking-[.1em] text-orange">Доступно</div>
           <div className="mt-2 font-head text-[32px] font-semibold text-orange">{availableDays} дней</div>
-          <div className="mt-1 text-[12px] text-muted">оплачиваемого отпуска</div>
+          <div className="mt-1 text-[12px] text-muted">оплачиваемого отпуска{leaveBalance.preliminary ? ' • предварительно' : ''}</div>
         </PlatformCard>
         <PlatformCard className="p-5">
           <div className="text-[11px] font-bold uppercase tracking-[.1em] text-muted">Запланировано</div>

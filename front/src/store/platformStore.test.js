@@ -5,6 +5,7 @@ import * as timeApi from '../api/time.api';
 import * as tasksApi from '../api/tasks.api';
 import * as casesApi from '../api/cases.api';
 import * as newsApi from '../api/news.api';
+import * as employeeServicesApi from '../api/employeeServices.api';
 
 jest.mock('../api/platform.api');
 jest.mock('../api/shifts.api');
@@ -12,6 +13,7 @@ jest.mock('../api/time.api');
 jest.mock('../api/tasks.api');
 jest.mock('../api/cases.api');
 jest.mock('../api/news.api');
+jest.mock('../api/employeeServices.api');
 
 describe('platformStore', () => {
   beforeEach(() => {
@@ -31,6 +33,10 @@ describe('platformStore', () => {
       shifts: [{ id: 1 }], tasks: [{ id: 2, done: false }],
       time_tracking: { state: 'clock_in' }, feature_flags: { shifts: true },
       permissions: ['platform.use'],
+      employee_services: {
+        learning_progress: [], document_requests: [], leave_requests: [],
+        leave_balance: { available_days: 24, preliminary: true },
+      },
     });
     shiftsApi.listOpen.mockResolvedValue({ shifts: [{ id: 3 }] });
     shiftsApi.listRequests.mockResolvedValue({ requests: [] });
@@ -57,23 +63,50 @@ describe('platformStore', () => {
     expect(usePlatformStore.getState().supportTickets[0].reference).toBe('BH-S-000007');
   });
 
-  test('persists learning progress without duplicating completed modules', () => {
+  test('persists learning progress returned by backend', async () => {
+    employeeServicesApi.completeModule.mockResolvedValue({
+      progress: {
+        course_id: 'service-standards', completed_module_ids: ['welcome'],
+        assessment_passed: false,
+      },
+    });
+    employeeServicesApi.completeAssessment.mockResolvedValue({
+      progress: {
+        course_id: 'service-standards', completed_module_ids: ['welcome'],
+        assessment_score: 100, assessment_passed: true,
+      },
+    });
     const store = usePlatformStore.getState();
-    store.completeLearningModule('service-standards', 'welcome');
-    usePlatformStore.getState().completeLearningModule('service-standards', 'welcome');
+    await store.completeLearningModule('service-standards', 'welcome');
 
     expect(usePlatformStore.getState().learningProgress['service-standards'].completedModuleIds).toEqual(['welcome']);
 
-    usePlatformStore.getState().completeLearningAssessment('service-standards', 100);
+    await usePlatformStore.getState().completeLearningAssessment('service-standards', 'a');
     expect(usePlatformStore.getState().learningProgress['service-standards'].assessmentPassed).toBe(true);
   });
 
-  test('creates document and leave requests and allows pending leave cancellation', () => {
-    const documentRequest = usePlatformStore.getState().createDocumentRequest({
+  test('creates document and leave requests and allows pending leave cancellation', async () => {
+    employeeServicesApi.createDocumentRequest.mockResolvedValue({ request: {
+      request_id: 1, reference: 'BH-D-000001', document_id: 'employment',
+      title: 'Справка с места работы', status: 'processing', version: 1,
+      created_at: '2026-08-12T00:00:00Z',
+    } });
+    employeeServicesApi.createLeaveRequest.mockResolvedValue({ request: {
+      request_id: 2, reference: 'BH-L-000002', leave_type: 'annual',
+      starts_on: '2026-10-01', ends_on: '2026-10-03', days: 3,
+      status: 'pending', version: 1, created_at: '2026-08-12T00:00:00Z',
+    }, leave_balance: { available_days: 24, preliminary: true } });
+    employeeServicesApi.cancelLeaveRequest.mockResolvedValue({ request: {
+      request_id: 2, reference: 'BH-L-000002', leave_type: 'annual',
+      starts_on: '2026-10-01', ends_on: '2026-10-03', days: 3,
+      status: 'cancelled', version: 2, created_at: '2026-08-12T00:00:00Z',
+    }, leave_balance: { available_days: 24, preliminary: true } });
+
+    const documentRequest = await usePlatformStore.getState().createDocumentRequest({
       documentId: 'employment',
       title: 'Справка с места работы',
     });
-    const leaveRequest = usePlatformStore.getState().createLeaveRequest({
+    const leaveRequest = await usePlatformStore.getState().createLeaveRequest({
       type: 'annual',
       typeLabel: 'Ежегодный оплачиваемый отпуск',
       startDate: '2026-10-01',
@@ -81,9 +114,9 @@ describe('platformStore', () => {
       days: 3,
     });
 
-    expect(documentRequest.id).toMatch(/^BH-D-/);
-    expect(leaveRequest.id).toMatch(/^BH-L-/);
-    usePlatformStore.getState().cancelLeaveRequest(leaveRequest.id);
+    expect(documentRequest.id).toBe('BH-D-000001');
+    expect(leaveRequest.id).toBe('BH-L-000002');
+    await usePlatformStore.getState().cancelLeaveRequest(leaveRequest.id);
     expect(usePlatformStore.getState().leaveRequests.find((item) => item.id === leaveRequest.id).status).toBe('cancelled');
   });
 });
