@@ -1,7 +1,8 @@
 # --- ТЗ не коммитим ---
 ТЗ.txt
 *.tz.txt
-
+output
+tmp
 # --- Dependencies ---
 node_modules/
 .pnp/
