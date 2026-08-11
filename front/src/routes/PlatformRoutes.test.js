@@ -2,6 +2,7 @@ import fs from 'fs';
 import {
   createPlatformNavigation,
   getPlatformBackRoute,
+  getPlatformCompactRouteTitle,
   isPlatformNavigationItemActive,
   PLATFORM_ROUTES,
 } from '../platform/platformConfig';
@@ -34,6 +35,14 @@ describe('staff platform route contract', () => {
     expect(navigation.find((item) => item.to === PLATFORM_ROUTES.tasks).badge).toBe(4);
   });
 
+  test('income remains discoverable while payroll integration is unavailable', () => {
+    const copy = {
+      today: 'Сегодня', shifts: 'Смены', income: 'Доход', tasks: 'Задачи', services: 'Сервисы',
+    };
+
+    expect(createPlatformNavigation(copy).some((item) => item.to === PLATFORM_ROUTES.income)).toBe(true);
+  });
+
   test('AppRouter declares every platform destination', () => {
     const source = fs.readFileSync(require.resolve('./AppRouter'), 'utf8');
     const routeSegments = ['', 'shifts', 'income', 'tasks', 'profile', 'notifications', 'support', 'news', 'services', 'learning', 'documents', 'leave', 'writeoff'];
@@ -59,5 +68,14 @@ describe('staff platform route contract', () => {
     expect(isPlatformNavigationItemActive(servicesItem, PLATFORM_ROUTES.documents)).toBe(true);
     expect(isPlatformNavigationItemActive(servicesItem, '/app/learning/service-standards')).toBe(true);
     expect(isPlatformNavigationItemActive(servicesItem, PLATFORM_ROUTES.profile)).toBe(false);
+  });
+
+  test('long service titles have compact mobile equivalents', () => {
+    const copy = {
+      platform: 'Платформа', services_short: 'Сервисы', learning: 'Обучение',
+      documents_short: 'Документы', vacation_short: 'Отпуск', support_short: 'Помощь',
+    };
+    expect(getPlatformCompactRouteTitle(PLATFORM_ROUTES.services, copy)).toBe('Сервисы');
+    expect(getPlatformCompactRouteTitle('/app/learning/service-standards', copy)).toBe('Обучение');
   });
 });

@@ -20,7 +20,7 @@ describe('employee services flows', () => {
 
   test('service hub and learning catalog render from a clean store', () => {
     const { unmount } = render(<PlatformServicesPage />);
-    expect(screen.getByRole('heading', { name: 'Сервисы сотрудника' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Всё необходимое для работы' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Обучение и допуски/ })).toHaveAttribute('href', '/app/learning');
 
     unmount();

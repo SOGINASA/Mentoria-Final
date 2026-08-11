@@ -13,6 +13,7 @@ import {
   createEmployeeServiceNavigation,
   createPlatformNavigation,
   getPlatformBackRoute,
+  getPlatformCompactRouteTitle,
   getPlatformRouteTitle,
   isEmployeeServiceRoute,
   isPlatformNavigationItemActive,
@@ -25,8 +26,7 @@ function usePlatformNav() {
   const pendingTaskCount = usePlatformStore((state) => (
     state.tasks.filter((task) => !task.done).length
   ));
-  const flags = usePlatformStore((state) => state.featureFlags);
-  return createPlatformNavigation(p, pendingTaskCount, flags);
+  return createPlatformNavigation(p, pendingTaskCount);
 }
 
 function PlatformSidebar() {
@@ -108,6 +108,7 @@ function PlatformHeader() {
   const { p } = usePlatformCopy();
   const secondary = isSecondaryPlatformRoute(pathname);
   const title = getPlatformRouteTitle(pathname, p);
+  const compactTitle = getPlatformCompactRouteTitle(pathname, p);
   const backRoute = getPlatformBackRoute(pathname);
   const backTitle = getPlatformRouteTitle(backRoute, p);
 
@@ -122,7 +123,7 @@ function PlatformHeader() {
         {secondary ? <><Icon name="chevronLeft" size={21} /><span className="hidden sm:inline">{p.back}</span></> : <Logo size="sm" />}
       </button>
       <div className="min-w-0 flex-1">
-        <h1 className="m-0 truncate font-head text-[20px] font-semibold tracking-wide text-text">{title}</h1>
+        <h1 className="m-0 truncate font-head text-[18px] font-semibold tracking-wide text-text sm:text-[20px]"><span className="sm:hidden">{compactTitle}</span><span className="hidden sm:inline">{title}</span></h1>
         <span className="hidden text-[11px] font-medium text-muted sm:block">{p.platform}</span>
       </div>
       <button
@@ -152,24 +153,44 @@ function PlatformHeader() {
 
 function PlatformSectionNav() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { p } = usePlatformCopy();
   if (!isEmployeeServiceRoute(pathname)) return null;
 
   const items = createEmployeeServiceNavigation(p);
+  const currentItem = items.find((item) => (
+    pathname === item.to || (!item.end && pathname.startsWith(`${item.to}/`))
+  )) || items[0];
   return (
-    <nav aria-label={p.services} className="border-b border-line bg-surface px-3 sm:px-6 lg:px-8">
-      <div className="flex min-h-14 gap-1 overflow-x-auto py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) => `inline-flex min-h-11 flex-none items-center gap-2 rounded-xl px-3 text-[12px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${isActive ? 'bg-green-tint text-green' : 'text-muted hover:bg-surface2 hover:text-text'}`}
+    <nav aria-label={p.services} className="bg-bg">
+      <div className="px-4 pt-3 sm:px-6 lg:hidden">
+        <div className="relative">
+          <span className="pointer-events-none absolute inset-y-0 left-4 grid place-items-center text-green"><Icon name={currentItem.icon} size={19} /></span>
+          <select
+            aria-label={p.services}
+            value={currentItem.to}
+            onChange={(event) => navigate(event.target.value)}
+            className="min-h-12 w-full appearance-none rounded-2xl border border-line bg-surface py-3 pl-12 pr-11 text-[14px] font-semibold text-text shadow-card-sm outline-none transition-colors focus:border-green focus:ring-2 focus:ring-green/20"
           >
-            <Icon name={item.icon} size={17} />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+            {items.map((item) => <option key={item.to} value={item.to}>{item.label}</option>)}
+          </select>
+          <span className="pointer-events-none absolute inset-y-0 right-4 grid place-items-center text-faint"><Icon name="chevronRight" size={18} className="rotate-90" /></span>
+        </div>
+      </div>
+      <div className="mx-auto hidden w-full max-w-[1180px] px-8 pt-4 lg:block">
+        <div className="grid grid-cols-5 gap-1 rounded-2xl border border-line bg-surface p-1.5 shadow-card-sm">
+          {items.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) => `inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl px-3 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${isActive ? 'bg-surface2 text-text' : 'text-muted hover:bg-surface2 hover:text-text'}`}
+            >
+              <Icon name={item.icon} size={17} />
+              <span className="truncate">{item.label}</span>
+            </NavLink>
+          ))}
+        </div>
       </div>
     </nav>
   );
