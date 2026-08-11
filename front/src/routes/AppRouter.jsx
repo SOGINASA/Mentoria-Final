@@ -1,5 +1,7 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import AppShell from '../components/layout/AppShell';
+import Spinner from '../components/ui/Spinner';
 import { RequireAuth, RequireRole, GuestOnly } from './guards';
 import { ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN } from '../constants/roles';
 
@@ -16,9 +18,25 @@ import ProfilePage from '../pages/common/ProfilePage';
 import NotificationsPage from '../pages/common/NotificationsPage';
 import NotFoundPage from '../pages/common/NotFoundPage';
 
+const PlatformShell = lazy(() => import('../platform/components/PlatformShell'));
+const PlatformHomePage = lazy(() => import('../platform/pages/PlatformHomePage'));
+const PlatformShiftsPage = lazy(() => import('../platform/pages/PlatformShiftsPage'));
+const PlatformIncomePage = lazy(() => import('../platform/pages/PlatformIncomePage'));
+const PlatformTasksPage = lazy(() => import('../platform/pages/PlatformTasksPage'));
+const PlatformProfilePage = lazy(() => import('../platform/pages/PlatformProfilePage'));
+const PlatformNotificationsPage = lazy(() => import('../platform/pages/PlatformNotificationsPage'));
+const PlatformSupportPage = lazy(() => import('../platform/pages/PlatformSupportPage'));
+const PlatformNewsPage = lazy(() => import('../platform/pages/PlatformNewsPage'));
+const PlatformComingSoonPage = lazy(() => import('../platform/pages/PlatformComingSoonPage'));
+
 const sender = (el) => <RequireRole roles={[ROLE_SENDER]}>{el}</RequireRole>;
 const reviewer = (el) => <RequireRole roles={[ROLE_REVIEWER, ROLE_ADMIN]}>{el}</RequireRole>;
 const admin = (el) => <RequireRole roles={[ROLE_ADMIN]}>{el}</RequireRole>;
+const platformPage = (el) => (
+  <Suspense fallback={<div className="grid min-h-[50dvh] place-items-center"><Spinner size={30} /></div>}>
+    {el}
+  </Suspense>
+);
 
 export default function AppRouter() {
   return (
@@ -31,6 +49,26 @@ export default function AppRouter() {
           </GuestOnly>
         }
       />
+
+      {/* Новая Staff Platform изолирована под /app; текущая система остаётся на прежних маршрутах. */}
+      <Route
+        path="/app"
+        element={
+          <RequireAuth>
+            {platformPage(<PlatformShell />)}
+          </RequireAuth>
+        }
+      >
+        <Route index element={platformPage(<PlatformHomePage />)} />
+        <Route path="shifts" element={platformPage(<PlatformShiftsPage />)} />
+        <Route path="income" element={platformPage(<PlatformIncomePage />)} />
+        <Route path="tasks" element={platformPage(<PlatformTasksPage />)} />
+        <Route path="profile" element={platformPage(<PlatformProfilePage />)} />
+        <Route path="notifications" element={platformPage(<PlatformNotificationsPage />)} />
+        <Route path="support" element={platformPage(<PlatformSupportPage />)} />
+        <Route path="news" element={platformPage(<PlatformNewsPage />)} />
+        <Route path="*" element={platformPage(<PlatformComingSoonPage />)} />
+      </Route>
 
       <Route
         element={

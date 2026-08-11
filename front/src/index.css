@@ -68,6 +68,22 @@
   box-sizing: border-box;
 }
 
+button,
+a {
+  touch-action: manipulation;
+}
+
+button:not(:disabled),
+a[href] {
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline-offset: 2px;
+}
+
 html,
 body,
 #root {
@@ -184,4 +200,15 @@ body {
   0% { transform: scale(0.7); opacity: 0; }
   60% { transform: scale(1.06); }
   100% { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
