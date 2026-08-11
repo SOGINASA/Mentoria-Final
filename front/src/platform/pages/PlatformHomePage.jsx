@@ -63,7 +63,7 @@ export default function PlatformHomePage() {
       />
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.75fr)]">
-        <PlatformCard className="relative overflow-hidden border-0 bg-green p-5 text-white shadow-card sm:p-6">
+        <PlatformCard variant="brand" className="relative overflow-hidden p-5 shadow-card sm:p-6">
           <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/10" />
           <div className="pointer-events-none absolute -bottom-24 right-20 h-48 w-48 rounded-full bg-orange/20" />
           <div className="relative z-[1]">

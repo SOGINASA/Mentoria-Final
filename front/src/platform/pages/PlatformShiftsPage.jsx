@@ -118,6 +118,7 @@ export default function PlatformShiftsPage() {
           <button type="button" onClick={() => setPeriodOffset((value) => value + 1)} className="grid h-11 w-11 cursor-pointer place-items-center rounded-2xl border border-line text-text transition-colors hover:bg-surface2 active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green" aria-label="Следующий период"><Icon name="chevronRight" size={19} /></button>
         </div>
 
+        <div key={`${view}-${periodOffset}`} className="platform-content-swap">
         {view === 'month' && <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase text-faint">{weekdayNames.map((name) => <span key={name} className="py-2">{name}</span>)}</div>}
         <div className={`grid grid-cols-7 ${view === 'week' ? 'gap-1.5 sm:gap-2' : 'gap-1 sm:gap-2'}`}>
           {period.days.map((day, index) => {
@@ -132,6 +133,7 @@ export default function PlatformShiftsPage() {
             );
           })}
         </div>
+        </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-[11px] font-medium text-muted">
           <span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-green" />{p.regular_shift}</span>
           <span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-line" />{p.day_off}</span>
@@ -143,7 +145,7 @@ export default function PlatformShiftsPage() {
           <SectionHeading title={p.upcoming} />
           <div className="space-y-3">
             {upcoming.map((shift, index) => (
-              <PlatformCard key={shift.id} className={`p-4 transition-colors sm:p-5 ${index === 0 ? 'border-green' : ''}`}>
+              <PlatformCard key={shift.id} variant={index === 0 ? 'greenOutline' : 'surface'} className="p-4 sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                   <button type="button" onClick={() => setModal({ type: 'details', shift })} className="flex cursor-pointer items-center gap-3.5 rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green sm:w-[210px]">
                     <IconTile icon="calendar" tone={index === 0 ? 'green' : 'neutral'} />

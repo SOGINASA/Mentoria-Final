@@ -97,7 +97,7 @@ export default function PlatformTasksPage() {
         ))}
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div key={tab} className="platform-content-swap mt-4 space-y-3">
         {filtered.length === 0 ? (
           <EmptyPlatformState title={p.no_tasks} subtitle={p.no_tasks_sub} />
         ) : filtered.map((task) => (
@@ -129,7 +129,7 @@ export default function PlatformTasksPage() {
         ))}
       </div>
 
-      <PlatformCard className="mt-6 border-orange bg-orange-tint p-5 sm:p-6">
+      <PlatformCard variant="orangeTint" className="mt-6 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <IconTile icon="camera" tone="orange" />
           <div className="min-w-0 flex-1">

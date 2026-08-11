@@ -48,9 +48,15 @@ export function StatusPill({ children, tone = 'green' }) {
   return <span className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-[11px] font-bold ${tones[tone] || tones.green}`}>{children}</span>;
 }
 
-export function PlatformCard({ children, className = '', as: Component = 'div', ...props }) {
+export function PlatformCard({ children, className = '', as: Component = 'div', variant = 'surface', ...props }) {
+  const variants = {
+    surface: 'border-line bg-surface',
+    brand: 'border-transparent bg-green text-white',
+    orangeTint: 'border-orange bg-orange-tint',
+    greenOutline: 'border-green bg-surface',
+  };
   return (
-    <Component className={`rounded-[22px] border border-line bg-surface shadow-card-sm ${className}`} {...props}>
+    <Component className={`rounded-[22px] border shadow-card-sm transition-[background-color,border-color,box-shadow] duration-200 ${variants[variant] || variants.surface} ${className}`} {...props}>
       {children}
     </Component>
   );
@@ -106,7 +112,7 @@ export function ProgressBar({ value, tone = 'green', label }) {
     <div>
       {label && <div className="mb-2 flex justify-between gap-3 text-[12px] font-semibold text-muted"><span>{label}</span><span className="tabular-nums text-text">{value}%</span></div>}
       <div className="h-2 overflow-hidden rounded-full bg-surface2" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={value}>
-        <div className={`h-full rounded-full ${colors[tone] || colors.green}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+        <div className={`h-full rounded-full transition-[width] duration-500 ease-out ${colors[tone] || colors.green}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
       </div>
     </div>
   );

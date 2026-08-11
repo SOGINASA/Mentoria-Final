@@ -27,7 +27,7 @@ function PlatformSidebar() {
   const { p } = usePlatformCopy();
 
   return (
-    <aside className="hidden lg:flex w-[272px] flex-none flex-col border-r border-line bg-surface px-4 py-5">
+    <aside className="hidden h-[100dvh] w-[272px] flex-none flex-col self-start overflow-y-auto overscroll-contain border-r border-line bg-surface px-4 py-5 lg:sticky lg:top-0 lg:flex">
       <button
         type="button"
         onClick={() => navigate('/app')}
@@ -49,7 +49,7 @@ function PlatformSidebar() {
             key={item.to}
             to={item.to}
             end={item.end}
-            className={({ isActive }) => `group relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[14px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${
+            className={({ isActive }) => `group relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[14px] font-semibold transition-[color,background-color,box-shadow,transform] duration-200 active:scale-[.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${
               isActive ? 'bg-green text-white shadow-card-sm' : 'text-muted hover:bg-surface2 hover:text-text'
             }`}
           >
@@ -120,7 +120,7 @@ function PlatformHeader() {
       >
         {secondary ? <Icon name="chevronLeft" size={21} /> : <Logo size="sm" />}
       </button>
-      <div className="min-w-0 flex-1">
+      <div className="min-h-[100dvh] min-w-0 flex-1">
         <h1 className="m-0 truncate font-head text-[20px] font-semibold tracking-wide text-text">{title}</h1>
         <span className="hidden text-[11px] font-medium text-muted sm:block">{p.platform}</span>
       </div>
@@ -194,6 +194,7 @@ export default function PlatformShell() {
   }, [startPolling, stopPolling]);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     mainRef.current?.focus({ preventScroll: true });
   }, [pathname]);
 
@@ -204,7 +205,9 @@ export default function PlatformShell() {
       <div className="min-w-0 flex-1">
         <PlatformHeader />
         <main ref={mainRef} tabIndex={-1} className="outline-none pb-[92px] lg:pb-8" id="platform-main">
-          <Outlet />
+          <div key={pathname} className="platform-route-frame">
+            <Outlet />
+          </div>
         </main>
       </div>
       <PlatformBottomNav />

@@ -30,7 +30,7 @@ export default function PlatformIncomePage() {
     <div className="mx-auto w-full max-w-[1380px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
       <PageIntro eyebrow={p.income} title={p.income_title} subtitle={p.income_sub} />
 
-      <PlatformCard className="relative mt-6 overflow-hidden border-0 bg-green p-5 text-white shadow-card sm:p-7">
+      <PlatformCard variant="brand" className="relative mt-6 overflow-hidden p-5 shadow-card sm:p-7">
         <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10" />
         <div className="relative z-[1] grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,.7fr)] lg:items-end">
           <div>
