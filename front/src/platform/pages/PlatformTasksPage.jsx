@@ -4,6 +4,7 @@ import Icon from '../../components/ui/Icon';
 import { useUiStore } from '../../store/uiStore';
 import { taskProgress, usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
+import { PLATFORM_ROUTES } from '../platformConfig';
 import PlatformModal from '../components/PlatformModal';
 import {
   DetailRow,
@@ -136,7 +137,7 @@ export default function PlatformTasksPage() {
             <div className="font-head text-[19px] font-semibold text-text">{p.writeoff}</div>
             <p className="mb-0 mt-1 text-[12px] leading-relaxed text-muted">Текущий рабочий сценарий остаётся доступен и открывается без изменений.</p>
           </div>
-          <PlatformButton icon="chevronRight" onClick={() => navigate('/create')}>{p.writeoff}</PlatformButton>
+          <PlatformButton icon="chevronRight" onClick={() => navigate(PLATFORM_ROUTES.writeoff)}>{p.writeoff}</PlatformButton>
         </div>
       </PlatformCard>
 

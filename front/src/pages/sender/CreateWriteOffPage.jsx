@@ -13,7 +13,7 @@ import { compressImage } from '../../utils/imageCompression';
 import { TYPE_NO_DEDUCTION, TYPE_WITH_DEDUCTION, MIN_COMMENT_LENGTH, MAX_PHOTOS } from '../../constants/writeOffTypes';
 import { initials } from '../../utils/format';
 
-export default function CreateWriteOffPage() {
+export default function CreateWriteOffPage({ exitPath = '/', successPath = '/my-requests' }) {
   const navigate = useNavigate();
   const { t, lang } = useI18n();
   const voice = useVoiceDictation(lang);
@@ -130,7 +130,7 @@ export default function CreateWriteOffPage() {
     setStepIndex((i) => i + 1);
   }
   function prev() {
-    if (stepIndex === 0) navigate('/');
+    if (stepIndex === 0) navigate(exitPath);
     else setStepIndex((i) => i - 1);
   }
 
@@ -147,7 +147,7 @@ export default function CreateWriteOffPage() {
         items: productName.trim() ? [{ product_name: productName.trim(), quantity: 1 }] : [],
       });
       showToast(t.sent_toast);
-      navigate('/my-requests', { replace: true });
+      navigate(successPath, { replace: true });
     } catch (err) {
       setError(err.message);
     }

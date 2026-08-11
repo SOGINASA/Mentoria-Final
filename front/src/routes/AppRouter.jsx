@@ -4,6 +4,7 @@ import AppShell from '../components/layout/AppShell';
 import Spinner from '../components/ui/Spinner';
 import { RequireAuth, RequireRole, GuestOnly } from './guards';
 import { ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN } from '../constants/roles';
+import { PLATFORM_ROUTES } from '../platform/platformConfig';
 
 import LoginPage from '../pages/auth/LoginPage';
 import SenderHomePage from '../pages/sender/SenderHomePage';
@@ -77,6 +78,7 @@ export default function AppRouter() {
         <Route path="learning/:courseId" element={platformPage(<PlatformCoursePage />)} />
         <Route path="documents" element={platformPage(<PlatformDocumentsPage />)} />
         <Route path="leave" element={platformPage(<PlatformLeavePage />)} />
+        <Route path="writeoff" element={sender(<CreateWriteOffPage exitPath={PLATFORM_ROUTES.home} successPath={PLATFORM_ROUTES.tasks} />)} />
         <Route path="*" element={platformPage(<PlatformComingSoonPage />)} />
       </Route>
 

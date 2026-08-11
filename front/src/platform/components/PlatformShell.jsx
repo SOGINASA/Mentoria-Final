@@ -10,9 +10,12 @@ import { HOME_ROUTE_BY_ROLE } from '../../constants/roles';
 import { usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
 import {
+  createEmployeeServiceNavigation,
   createPlatformNavigation,
   getPlatformBackRoute,
   getPlatformRouteTitle,
+  isEmployeeServiceRoute,
+  isPlatformNavigationItemActive,
   isSecondaryPlatformRoute,
   PLATFORM_ROUTES,
 } from '../platformConfig';
@@ -29,6 +32,7 @@ function usePlatformNav() {
 function PlatformSidebar() {
   const nav = usePlatformNav();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const user = useAuthStore((s) => s.user);
   const { p } = usePlatformCopy();
 
@@ -51,25 +55,21 @@ function PlatformSidebar() {
 
       <nav aria-label="Platform navigation" className="flex flex-col gap-1.5">
         {nav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) => `group relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[14px] font-semibold transition-[color,background-color,box-shadow,transform] duration-200 active:scale-[.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${
-              isActive ? 'bg-brand text-on-brand shadow-card-sm' : 'text-muted hover:bg-surface2 hover:text-text'
-            }`}
-          >
-            {({ isActive }) => (
-              <>
-                <Icon name={item.icon} size={21} strokeWidth={isActive ? 2.25 : 2} />
-                <span className="flex-1">{item.label}</span>
-                {item.badge > 0 && (
-                  <span className={`grid min-w-5 h-5 place-items-center rounded-full px-1.5 text-[10px] font-bold ${isActive ? 'bg-white text-green' : 'bg-orange text-white'}`}>
-                    {item.badge}
-                  </span>
-                )}
-              </>
-            )}
+          <NavLink key={item.to} to={item.to} end={item.end} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
+            {({ isActive: routerIsActive }) => {
+              const isActive = isPlatformNavigationItemActive(item, pathname, routerIsActive);
+              return (
+                <span aria-current={isActive ? 'page' : undefined} className={`group relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[14px] font-semibold transition-[color,background-color,box-shadow,transform] duration-200 active:scale-[.985] ${isActive ? 'bg-brand text-on-brand shadow-card-sm' : 'text-muted hover:bg-surface2 hover:text-text'}`}>
+                  <Icon name={item.icon} size={21} strokeWidth={isActive ? 2.25 : 2} />
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge > 0 && (
+                    <span className={`grid min-w-5 h-5 place-items-center rounded-full px-1.5 text-[10px] font-bold ${isActive ? 'bg-white text-green' : 'bg-orange text-white'}`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </span>
+              );
+            }}
           </NavLink>
         ))}
       </nav>
@@ -108,16 +108,18 @@ function PlatformHeader() {
   const { p } = usePlatformCopy();
   const secondary = isSecondaryPlatformRoute(pathname);
   const title = getPlatformRouteTitle(pathname, p);
+  const backRoute = getPlatformBackRoute(pathname);
+  const backTitle = getPlatformRouteTitle(backRoute, p);
 
   return (
     <header className="sticky top-0 z-20 flex h-16 flex-none items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur-md sm:px-6 lg:px-8">
       <button
         type="button"
-        onClick={() => navigate(secondary ? getPlatformBackRoute(pathname) : PLATFORM_ROUTES.home)}
-        className="grid h-11 min-w-11 cursor-pointer place-items-center rounded-xl lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
-        aria-label={secondary ? p.back : p.today}
+        onClick={() => navigate(secondary ? backRoute : PLATFORM_ROUTES.home)}
+        className={`h-11 min-w-11 cursor-pointer items-center justify-center rounded-xl text-[12px] font-bold text-muted transition-colors hover:bg-surface2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${secondary ? 'inline-flex gap-1.5 px-2 sm:px-3' : 'grid lg:hidden'}`}
+        aria-label={secondary ? `${p.back}: ${backTitle}` : p.today}
       >
-        {secondary ? <Icon name="chevronLeft" size={21} /> : <Logo size="sm" />}
+        {secondary ? <><Icon name="chevronLeft" size={21} /><span className="hidden sm:inline">{p.back}</span></> : <Logo size="sm" />}
       </button>
       <div className="min-w-0 flex-1">
         <h1 className="m-0 truncate font-head text-[20px] font-semibold tracking-wide text-text">{title}</h1>
@@ -148,33 +150,54 @@ function PlatformHeader() {
   );
 }
 
+function PlatformSectionNav() {
+  const { pathname } = useLocation();
+  const { p } = usePlatformCopy();
+  if (!isEmployeeServiceRoute(pathname)) return null;
+
+  const items = createEmployeeServiceNavigation(p);
+  return (
+    <nav aria-label={p.services} className="border-b border-line bg-surface px-3 sm:px-6 lg:px-8">
+      <div className="flex min-h-14 gap-1 overflow-x-auto py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {items.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) => `inline-flex min-h-11 flex-none items-center gap-2 rounded-xl px-3 text-[12px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${isActive ? 'bg-green-tint text-green' : 'text-muted hover:bg-surface2 hover:text-text'}`}
+          >
+            <Icon name={item.icon} size={17} />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 function PlatformBottomNav() {
   const nav = usePlatformNav();
+  const { pathname } = useLocation();
   return (
     <nav aria-label="Platform navigation" className="fixed inset-x-0 bottom-0 z-30 grid h-[72px] grid-flow-col auto-cols-fr border-t border-line bg-surface/95 px-1 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md lg:hidden">
       {nav.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end}
-          className={({ isActive }) => `relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${isActive ? 'text-green' : 'text-faint'}`}
-        >
-          {({ isActive }) => (
-            <>
-              <span className={`grid h-7 min-w-10 place-items-center rounded-full transition-colors ${isActive ? 'bg-green-tint' : ''}`}>
-                <Icon name={item.icon} size={21} strokeWidth={isActive ? 2.35 : 2} />
-              </span>
-              <span className="max-w-full truncate">{item.label}</span>
-              {item.badge > 0 && (
-                <span
-                  className="absolute top-0 grid h-4 min-w-4 place-items-center rounded-full bg-orange px-1 text-[8px] font-bold text-white"
-                  style={{ right: 'calc(50% - 25px)' }}
-                >
-                  {item.badge}
+        <NavLink key={item.to} to={item.to} end={item.end} className="h-full min-w-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
+          {({ isActive: routerIsActive }) => {
+            const isActive = isPlatformNavigationItemActive(item, pathname, routerIsActive);
+            return (
+              <span aria-current={isActive ? 'page' : undefined} className={`relative flex h-full min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold transition-colors ${isActive ? 'text-green' : 'text-faint'}`}>
+                <span className={`grid h-7 min-w-10 place-items-center rounded-full transition-colors ${isActive ? 'bg-green-tint' : ''}`}>
+                  <Icon name={item.icon} size={21} strokeWidth={isActive ? 2.35 : 2} />
                 </span>
-              )}
-            </>
-          )}
+                <span className="max-w-full truncate">{item.label}</span>
+                {item.badge > 0 && (
+                  <span className="absolute top-0 grid h-4 min-w-4 place-items-center rounded-full bg-orange px-1 text-[8px] font-bold text-white" style={{ right: 'calc(50% - 25px)' }}>
+                    {item.badge}
+                  </span>
+                )}
+              </span>
+            );
+          }}
         </NavLink>
       ))}
     </nav>
@@ -205,6 +228,7 @@ export default function PlatformShell() {
       <PlatformSidebar />
       <div className="min-w-0 flex-1">
         <PlatformHeader />
+        <PlatformSectionNav />
         <main ref={mainRef} tabIndex={-1} className="outline-none pb-[92px] lg:pb-8" id="platform-main">
           <div key={pathname} className="platform-route-frame">
             <Outlet />
