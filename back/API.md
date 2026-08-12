@@ -207,6 +207,14 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
   store scopes менеджера; новые типы добавлены в ответ отдельными массивами и
   счётчиками `document_requests`/`leave_requests`.
 
+### Повтор manager-операций
+
+Все изменяющие manager endpoints принимают заголовок `Idempotency-Key` длиной
+8–120 символов. Успешный ответ и доменное изменение фиксируются одной
+транзакцией. Повтор с тем же пользователем, методом и URL возвращает исходный
+ответ с `Idempotency-Replayed: true`; использование ключа для другого endpoint
+возвращает `409`.
+
 ## Сервисы сотрудника
 
 - `GET /api/employee-services` — прогресс обучения, запросы документов, заявки

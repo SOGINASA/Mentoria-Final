@@ -10,6 +10,7 @@ from constants import ROLE_MANAGER, ROLE_SENDER
 from models import User, db
 from platform_models import Shift, ShiftAssignment, ShiftRequest
 from services.audit import audit
+from services.idempotency import idempotent_mutation
 from services.notifications import notify
 from services.permissions import can_access_store
 from utils.auth_helpers import get_current_user, permission_required
@@ -105,6 +106,7 @@ def create_request(shift_id):
 
 @shifts_bp.post('/manager')
 @permission_required('shifts.manage')
+@idempotent_mutation
 def create_shift():
     user = get_current_user()
     data = request.get_json(silent=True) or {}
@@ -122,12 +124,12 @@ def create_shift():
     db.session.add(item)
     db.session.flush()
     audit(user, 'shift.created', 'shift', item.id, item.store_id)
-    db.session.commit()
     return jsonify({'shift': item.to_dict()}), 201
 
 
 @shifts_bp.patch('/manager/<int:shift_id>')
 @permission_required('shifts.manage')
+@idempotent_mutation
 def update_shift(shift_id):
     user = get_current_user()
     item = Shift.query.get_or_404(shift_id)
@@ -151,12 +153,12 @@ def update_shift(shift_id):
             setattr(item, field, data[field])
     item.version += 1
     audit(user, 'shift.updated', 'shift', item.id, item.store_id, {'version': item.version})
-    db.session.commit()
     return jsonify({'shift': item.to_dict()})
 
 
 @shifts_bp.post('/manager/<int:shift_id>/assignments')
 @permission_required('shifts.manage')
+@idempotent_mutation
 def assign_shift(shift_id):
     manager = get_current_user()
     shift = Shift.query.get_or_404(shift_id)
@@ -183,12 +185,12 @@ def assign_shift(shift_id):
         notify(employee.id, 'shift_assigned', 'Назначена смена', body=shift.title,
                entity_type='shift', entity_id=shift.id, action_url='/app/shifts', commit=False)
     audit(manager, 'shift.assigned', 'shift', shift.id, shift.store_id, {'user_id': employee.id})
-    db.session.commit()
     return jsonify({'assignment': assignment.to_dict()}), 201
 
 
 @shifts_bp.delete('/manager/<int:shift_id>/assignments/<int:user_id>')
 @permission_required('shifts.manage')
+@idempotent_mutation
 def remove_assignment(shift_id, user_id):
     manager = get_current_user()
     shift = Shift.query.get_or_404(shift_id)
@@ -210,12 +212,12 @@ def remove_assignment(shift_id, user_id):
            entity_type='shift', entity_id=shift.id, action_url='/app/shifts', commit=False)
     audit(manager, 'shift.unassigned', 'shift', shift.id, shift.store_id,
           {'user_id': user_id, 'reason': data.get('reason')})
-    db.session.commit()
     return jsonify({'assignment': assignment.to_dict(), 'shift': shift.to_dict()})
 
 
 @shifts_bp.post('/manager/<int:shift_id>/cancel')
 @permission_required('shifts.manage')
+@idempotent_mutation
 def cancel_shift(shift_id):
     manager = get_current_user()
     shift = Shift.query.get_or_404(shift_id)
@@ -245,12 +247,12 @@ def cancel_shift(shift_id):
         item.decided_at = utcnow()
         item.version += 1
     audit(manager, 'shift.cancelled', 'shift', shift.id, shift.store_id, {'reason': reason})
-    db.session.commit()
     return jsonify({'shift': shift.to_dict()})
 
 
 @shifts_bp.post('/manager/<int:shift_id>/publish')
 @permission_required('shifts.manage')
+@idempotent_mutation
 def publish_shift(shift_id):
     user = get_current_user()
     shift = Shift.query.get_or_404(shift_id)
@@ -266,7 +268,6 @@ def publish_shift(shift_id):
                body=shift.title, entity_type='shift', entity_id=shift.id,
                action_url='/app/shifts', commit=False)
     audit(user, 'shift.published', 'shift', shift.id, shift.store_id)
-    db.session.commit()
     return jsonify({'shift': shift.to_dict()})
 
 
@@ -282,6 +283,7 @@ def manager_requests():
 
 @shifts_bp.post('/manager/requests/<int:request_id>/decision')
 @permission_required('shifts.manage')
+@idempotent_mutation
 def decide_request(request_id):
     manager = get_current_user()
     item = ShiftRequest.query.get_or_404(request_id)
@@ -321,7 +323,7 @@ def decide_request(request_id):
     audit(manager, f'shift_request.{decision}', 'shift_request', item.id,
           item.shift.store_id, {'reason': item.decision_reason})
     try:
-        db.session.commit()
+        db.session.flush()
     except IntegrityError:
         db.session.rollback()
         return jsonify({'error': 'Запрос конфликтует с уже принятым решением'}), 409

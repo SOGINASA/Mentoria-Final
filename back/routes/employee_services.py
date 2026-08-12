@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request
 from models import User, db
 from platform_models import EmployeeDocumentRequest, LearningProgress, LeaveRequest
 from services.audit import audit
+from services.idempotency import idempotent_mutation
 from services.employee_services import (
     DOCUMENT_CATALOG, LEARNING_CATALOG, LEAVE_TYPES,
     employee_services_payload, leave_balance, local_today,
@@ -202,6 +203,7 @@ def manager_document_requests():
 
 @employee_services_bp.post('/manager/documents/requests/<int:request_id>/decision')
 @permission_required('employee_services.manage')
+@idempotent_mutation
 def decide_document_request(request_id):
     manager = get_current_user()
     item = EmployeeDocumentRequest.query.get_or_404(request_id)
@@ -230,7 +232,6 @@ def decide_document_request(request_id):
            action_url='/app/documents', commit=False)
     audit(manager, f'document_request.{decision}', 'employee_document_request',
           item.id, item.store_id, {'reason': item.decision_reason})
-    db.session.commit()
     return jsonify({'request': item.to_dict()})
 
 
@@ -245,6 +246,7 @@ def manager_leave_requests():
 
 @employee_services_bp.post('/manager/leave/requests/<int:request_id>/decision')
 @permission_required('employee_services.manage')
+@idempotent_mutation
 def decide_leave_request(request_id):
     manager = get_current_user()
     item = LeaveRequest.query.get_or_404(request_id)
@@ -280,6 +282,5 @@ def decide_leave_request(request_id):
            action_url='/app/leave', commit=False)
     audit(manager, f'leave_request.{decision}', 'leave_request', item.id,
           item.store_id, {'reason': item.decision_reason})
-    db.session.commit()
     return jsonify({'request': item.to_dict(),
                     'leave_balance': leave_balance(requester)})

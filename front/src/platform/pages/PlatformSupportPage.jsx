@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import * as casesApi from '../../api/cases.api';
 import Icon from '../../components/ui/Icon';
 import Spinner from '../../components/ui/Spinner';
+import { submitManagerMutation } from '../../offline/managerMutationQueue';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
 import { usePlatformStore } from '../../store/platformStore';
@@ -53,13 +54,21 @@ export default function PlatformSupportPage() {
     setLoading(true);
     setError('');
     try {
-      let updated = selectedTicket;
-      if (reply.trim()) updated = (await casesApi.addMessage(selectedTicket.id, reply.trim())).case;
-      if (caseStatus !== updated.status) updated = (await casesApi.update(selectedTicket.id, { status: caseStatus })).case;
-      setTickets((items) => items.map((item) => item.id === updated.id ? updated : item));
-      setSelectedTicket(updated);
+      const result = await submitManagerMutation('case.process', {
+        caseId: selectedTicket.id,
+        current: selectedTicket,
+        reply: reply.trim(),
+        status: caseStatus,
+      }, user?.id);
+      if (!result.queued) {
+        const updated = result.case;
+        setTickets((items) => items.map((item) => item.id === updated.id ? updated : item));
+        setSelectedTicket(updated);
+      } else {
+        setSelectedTicket(null);
+      }
       setReply('');
-      showToast('Обращение обновлено');
+      showToast(result.queued ? 'Нет сети: ответ сохранён в очереди' : 'Обращение обновлено');
     } catch (requestError) {
       setError(requestError.message || 'Не удалось обработать обращение');
     } finally {

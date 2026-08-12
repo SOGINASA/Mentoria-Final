@@ -11,6 +11,7 @@ from platform_models import (
     Shift, ShiftAssignment, TimeCorrectionRequest, TimeEvent, Timecard,
 )
 from services.audit import audit
+from services.idempotency import idempotent_mutation
 from services.notifications import notify
 from services.permissions import can_access_store
 from utils.auth_helpers import get_current_user, permission_required
@@ -216,6 +217,7 @@ def manager_timecards():
 
 @time_tracking_bp.post('/manager/timecards/<int:card_id>/decision')
 @permission_required('time.manage')
+@idempotent_mutation
 def decide_timecard(card_id):
     manager = get_current_user()
     card = Timecard.query.get_or_404(card_id)
@@ -237,7 +239,6 @@ def decide_timecard(card_id):
            entity_type='timecard', entity_id=card.id, action_url='/app/income', commit=False)
     audit(manager, f'timecard.{card.status}', 'timecard', card.id, card.store_id,
           {'reason': data.get('reason')})
-    db.session.commit()
     return jsonify({'timecard': card.to_dict()})
 
 
@@ -252,6 +253,7 @@ def manager_corrections():
 
 @time_tracking_bp.post('/manager/corrections/<int:correction_id>/decision')
 @permission_required('time.manage')
+@idempotent_mutation
 def decide_correction(correction_id):
     manager = get_current_user()
     item = TimeCorrectionRequest.query.get_or_404(correction_id)
@@ -288,5 +290,4 @@ def decide_correction(correction_id):
            entity_type='time_correction', entity_id=item.id, action_url='/app/income', commit=False)
     audit(manager, f'time_correction.{decision}', 'time_correction', item.id, card.store_id,
           {'before': before, 'after': card.to_dict(), 'reason': item.decision_reason})
-    db.session.commit()
     return jsonify({'correction': item.to_dict(), 'timecard': card.to_dict()})

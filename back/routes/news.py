@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required
 from models import db
 from platform_models import NewsPost, NewsRead
 from services.audit import audit
+from services.idempotency import idempotent_mutation
 from services.permissions import can_access_store, has_permission, scoped_store_ids
 from utils.auth_helpers import get_current_user
 from utils.platform_helpers import parse_datetime, utcnow
@@ -41,6 +42,7 @@ def mark_news_read(post_id):
 
 @news_bp.post('/manager')
 @jwt_required()
+@idempotent_mutation
 def create_news():
     user = get_current_user()
     if not has_permission(user, 'news.manage'):
@@ -66,5 +68,4 @@ def create_news():
     db.session.add(item)
     db.session.flush()
     audit(user, 'news.created', 'news_post', item.id, item.store_id, {'status': status})
-    db.session.commit()
     return jsonify({'post': item.to_dict()}), 201

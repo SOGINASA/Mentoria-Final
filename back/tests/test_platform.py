@@ -6,7 +6,7 @@ import pytest
 
 from constants import ROLE_MANAGER
 from models import User, db
-from platform_models import AuditEvent, TimeEvent
+from platform_models import AuditEvent, MutationReceipt, Shift, TimeEvent
 
 
 @pytest.fixture()
@@ -66,6 +66,29 @@ def test_manager_workspace_returns_scoped_team_and_operational_data(client, stor
     assert [item['id'] for item in payload['stores']] == [store.id]
     assert sender.id in [item['id'] for item in payload['team']]
     assert shift['id'] in [item['id'] for item in payload['shifts']]
+
+
+def test_manager_mutation_idempotency_replays_without_duplicate(client, store, manager, auth):
+    headers = {**auth(manager), 'Idempotency-Key': 'manager-offline-create-001'}
+    payload = {
+        'store_id': store.id, 'title': 'Офлайн-смена',
+        'starts_at': iso(2), 'ends_at': iso(8), 'headcount': 1,
+    }
+
+    first = client.post('/api/shifts/manager', headers=headers, json=payload)
+    replay = client.post('/api/shifts/manager', headers=headers, json=payload)
+
+    assert first.status_code == 201
+    assert replay.status_code == 201
+    assert replay.headers['Idempotency-Replayed'] == 'true'
+    assert replay.get_json() == first.get_json()
+    assert Shift.query.count() == 1
+    assert MutationReceipt.query.count() == 1
+
+    reused = client.post('/api/tasks/manager', headers=headers, json={
+        'store_id': store.id, 'title': 'Другой запрос',
+    })
+    assert reused.status_code == 409
 
 
 def test_shift_assignment_rejects_overlap(client, store, sender, manager, auth):

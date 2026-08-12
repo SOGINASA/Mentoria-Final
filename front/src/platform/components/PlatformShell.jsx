@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Logo from '../../components/ui/Logo';
 import Icon from '../../components/ui/Icon';
@@ -6,7 +6,13 @@ import Toast from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifyStore } from '../../store/notifyStore';
 import { initials } from '../../utils/format';
-import { LEGACY_HOME_ROUTE_BY_ROLE, ROLE_ADMIN } from '../../constants/roles';
+import { LEGACY_HOME_ROUTE_BY_ROLE } from '../../constants/roles';
+import {
+  flushManagerMutations,
+  getManagerQueueSnapshot,
+  retryManagerMutations,
+  subscribeManagerQueue,
+} from '../../offline/managerMutationQueue';
 import { usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
 import {
@@ -87,7 +93,7 @@ function PlatformSidebar() {
       </nav>
 
       <div className="flex-1" />
-      {legacyHome && <button
+      {legacyHome && legacyHome !== PLATFORM_ROUTES.home && <button
         type="button"
         onClick={() => navigate(legacyHome)}
         className="mb-3 flex min-h-12 items-center gap-3 rounded-2xl border border-line bg-surface2 px-3.5 text-left text-[13px] font-semibold text-muted transition-colors hover:border-green hover:text-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
@@ -243,6 +249,22 @@ export default function PlatformShell() {
   const startPolling = useNotifyStore((s) => s.startPolling);
   const stopPolling = useNotifyStore((s) => s.stopPolling);
   const hydrate = usePlatformStore((s) => s.hydrate);
+  const userId = useAuthStore((s) => s.user?.id);
+  const [mutationQueue, setMutationQueue] = useState({ pending: 0, failed: 0 });
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    const refresh = () => setMutationQueue(getManagerQueueSnapshot(userId));
+    const flush = () => flushManagerMutations(userId).then(refresh).catch(refresh);
+    refresh();
+    flush();
+    const unsubscribe = subscribeManagerQueue(refresh);
+    window.addEventListener('online', flush);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('online', flush);
+    };
+  }, [userId]);
 
   useEffect(() => {
     startPolling();
@@ -261,6 +283,19 @@ export default function PlatformShell() {
       <PlatformSidebar />
       <div className="min-w-0 flex-1">
         <PlatformHeader />
+        {(mutationQueue.pending > 0 || mutationQueue.failed > 0) && (
+          <div role="status" className="flex min-h-11 items-center gap-3 border-b border-orange bg-orange-tint px-4 py-2 text-[12px] text-text sm:px-6 lg:px-8">
+            <Icon name={mutationQueue.failed ? 'alertTriangle' : 'refresh'} size={17} className="flex-none text-orange" />
+            <span className="min-w-0 flex-1 font-semibold">
+              {mutationQueue.failed
+                ? `${mutationQueue.failed} действий требуют повторной отправки`
+                : `${mutationQueue.pending} действий ожидают подключения к сети`}
+            </span>
+            <button type="button" onClick={() => retryManagerMutations(userId)} className="min-h-9 rounded-xl border border-orange bg-surface px-3 font-bold text-orange">
+              Повторить
+            </button>
+          </div>
+        )}
         <PlatformSectionNav />
         <main ref={mainRef} tabIndex={-1} className="outline-none pb-[92px] lg:pb-8" id="platform-main">
           <div key={pathname} className="platform-route-frame">

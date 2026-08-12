@@ -8,6 +8,7 @@ from platform_models import (
     PlatformTask, TaskStepResult, TaskTemplate, TaskTemplateStep,
 )
 from services.audit import audit
+from services.idempotency import idempotent_mutation
 from services.notifications import notify
 from services.permissions import can_access_store
 from utils.auth_helpers import get_current_user, permission_required
@@ -94,6 +95,7 @@ def reopen_task(task_id):
 
 @tasks_bp.post('/manager/templates')
 @permission_required('tasks.manage')
+@idempotent_mutation
 def create_template():
     user = get_current_user()
     data = request.get_json(silent=True) or {}
@@ -115,12 +117,12 @@ def create_template():
                                         evidence_required=bool(value.get('evidence_required'))
                                         if isinstance(value, dict) else False))
     audit(user, 'task_template.created', 'task_template', template.id, store_id)
-    db.session.commit()
     return jsonify({'template': {'id': template.id, 'title': template.title}}), 201
 
 
 @tasks_bp.post('/manager')
 @permission_required('tasks.manage')
+@idempotent_mutation
 def create_task():
     user = get_current_user()
     data = request.get_json(silent=True) or {}
@@ -156,12 +158,13 @@ def create_task():
         notify(assignee_id, 'task_assigned', 'Новая задача', body=item.title,
                entity_type='task', entity_id=item.id, action_url='/app/tasks', commit=False)
     audit(user, 'task.created', 'task', item.id, store_id, {'assignee_id': assignee_id})
-    db.session.commit()
+    db.session.flush()
     return jsonify({'task': item.to_dict()}), 201
 
 
 @tasks_bp.patch('/manager/<int:task_id>')
 @permission_required('tasks.manage')
+@idempotent_mutation
 def update_managed_task(task_id):
     manager = get_current_user()
     item = PlatformTask.query.get_or_404(task_id)
@@ -205,12 +208,12 @@ def update_managed_task(task_id):
                action_url='/app/tasks', commit=False)
     audit(manager, 'task.updated', 'task', item.id, item.store_id,
           {'previous_assignee_id': previous_assignee_id, 'assignee_id': item.assignee_id})
-    db.session.commit()
     return jsonify({'task': item.to_dict()})
 
 
 @tasks_bp.delete('/manager/<int:task_id>')
 @permission_required('tasks.manage')
+@idempotent_mutation
 def cancel_managed_task(task_id):
     manager = get_current_user()
     item = PlatformTask.query.get_or_404(task_id)
@@ -231,7 +234,6 @@ def cancel_managed_task(task_id):
                body=reason or item.title, entity_type='task', entity_id=item.id,
                action_url='/app/tasks', commit=False)
     audit(manager, 'task.cancelled', 'task', item.id, item.store_id, {'reason': reason})
-    db.session.commit()
     return jsonify({'task': item.to_dict()})
 
 
@@ -246,6 +248,7 @@ def manager_tasks():
 
 @tasks_bp.post('/manager/<int:task_id>/review')
 @permission_required('tasks.manage')
+@idempotent_mutation
 def review_task(task_id):
     user = get_current_user()
     item = PlatformTask.query.get_or_404(task_id)
@@ -268,5 +271,4 @@ def review_task(task_id):
                body='Принята' if decision == 'approved' else 'Возвращена на доработку',
                entity_type='task', entity_id=item.id, action_url='/app/tasks', commit=False)
     audit(user, f'task.{decision}', 'task', item.id, item.store_id)
-    db.session.commit()
     return jsonify({'task': item.to_dict()})

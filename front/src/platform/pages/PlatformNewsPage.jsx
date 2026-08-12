@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import * as managerApi from '../../api/manager.api';
-import * as newsApi from '../../api/news.api';
 import Icon from '../../components/ui/Icon';
+import { submitManagerMutation } from '../../offline/managerMutationQueue';
+import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
 import { usePlatformCopy } from '../platformCopy';
 import PlatformModal from '../components/PlatformModal';
@@ -18,6 +19,7 @@ function formatPublishedAt(value, lang) {
 }
 
 export default function PlatformNewsPage() {
+  const userId = useAuthStore((state) => state.user?.id);
   const { p, lang } = usePlatformCopy();
   const [selected, setSelected] = useState(null);
   const news = usePlatformStore((state) => state.news);
@@ -57,14 +59,14 @@ export default function PlatformNewsPage() {
     }
     setSubmitting(true);
     try {
-      await newsApi.create({
+      const result = await submitManagerMutation('news.create', { body: {
         title: form.title.trim(), excerpt: form.excerpt.trim() || undefined, body: form.body.trim(),
         category: form.category, audience_role: form.audienceRole || undefined,
         store_id: Number(form.storeId), status,
-      });
+      } }, userId);
       setEditorOpen(false);
       setForm((current) => ({ title: '', excerpt: '', body: '', category: 'Операции', audienceRole: '', storeId: current.storeId }));
-      showToast(status === 'published' ? 'Новость опубликована' : 'Черновик сохранён');
+      showToast(result.queued ? 'Нет сети: новость сохранена в очереди' : status === 'published' ? 'Новость опубликована' : 'Черновик сохранён');
     } catch (requestError) {
       setError(requestError.message || 'Не удалось сохранить новость');
     } finally {

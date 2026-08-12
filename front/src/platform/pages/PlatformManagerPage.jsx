@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as managerApi from '../../api/manager.api';
 import Icon from '../../components/ui/Icon';
 import Spinner from '../../components/ui/Spinner';
+import { FLUSH_EVENT, submitManagerMutation } from '../../offline/managerMutationQueue';
+import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
 import PlatformModal from '../components/PlatformModal';
 import {
@@ -70,6 +72,7 @@ function userName(team, id) {
 
 export default function PlatformManagerPage() {
   const showToast = useUiStore((state) => state.showToast);
+  const userId = useAuthStore((state) => state.user?.id);
   const [workspace, setWorkspace] = useState({ stores: [], team: [], shifts: [], tasks: [] });
   const [storeFilter, setStoreFilter] = useState(() => new URLSearchParams(window.location.search).get('store_id') || 'all');
   const [tab, setTab] = useState('overview');
@@ -101,6 +104,11 @@ export default function PlatformManagerPage() {
 
   useEffect(() => {
     reload();
+  }, [reload]);
+
+  useEffect(() => {
+    window.addEventListener(FLUSH_EVENT, reload);
+    return () => window.removeEventListener(FLUSH_EVENT, reload);
   }, [reload]);
 
   useEffect(() => {
@@ -239,15 +247,19 @@ export default function PlatformManagerPage() {
         return;
       }
       const result = modal === 'shiftEdit'
-        ? await managerApi.updateShift(shiftForm.id, { ...payload, version: shiftForm.version })
-        : await managerApi.createShift(payload);
-      for (const userId of newAssigneeIds) {
-        await managerApi.assignShift(result.shift.id, userId);
-      }
-      if (modal === 'shift' && shiftForm.publish) await managerApi.publishShift(result.shift.id);
-      await reload();
+        ? await submitManagerMutation('shift.update', {
+          shiftId: shiftForm.id,
+          shift: { ...payload, version: shiftForm.version },
+          assigneeIds: newAssigneeIds,
+        }, userId)
+        : await submitManagerMutation('shift.create', {
+          shift: payload,
+          assigneeIds: newAssigneeIds,
+          publish: shiftForm.publish,
+        }, userId);
+      if (!result.queued) await reload();
       setModal(null);
-      showToast(modal === 'shiftEdit' ? 'Смена обновлена' : shiftForm.publish ? 'Смена создана и опубликована' : 'Черновик смены сохранён');
+      showToast(result.queued ? 'Нет сети: изменение смены сохранено в очереди' : modal === 'shiftEdit' ? 'Смена обновлена' : shiftForm.publish ? 'Смена создана и опубликована' : 'Черновик смены сохранён');
     } catch (requestError) {
       setFormError(requestError.message || 'Не удалось создать смену');
     } finally {
@@ -257,9 +269,9 @@ export default function PlatformManagerPage() {
 
   async function publishShift(shift) {
     try {
-      await managerApi.publishShift(shift.id);
-      await reload();
-      showToast('Смена опубликована');
+      const result = await submitManagerMutation('shift.publish', { shiftId: shift.id }, userId);
+      if (!result.queued) await reload();
+      showToast(result.queued ? 'Публикация сохранена в очереди' : 'Смена опубликована');
     } catch (requestError) {
       showToast(requestError.message || 'Не удалось опубликовать смену');
     }
@@ -282,11 +294,12 @@ export default function PlatformManagerPage() {
         task_type: taskForm.taskType,
         steps: taskForm.steps.split('\n').map((step) => step.trim()).filter(Boolean),
       };
-      if (modal === 'taskEdit') await managerApi.updateTask(taskForm.id, { ...payload, version: taskForm.version });
-      else await managerApi.createTask(payload);
-      await reload();
+      const result = modal === 'taskEdit'
+        ? await submitManagerMutation('task.update', { taskId: taskForm.id, body: { ...payload, version: taskForm.version } }, userId)
+        : await submitManagerMutation('task.create', { body: payload }, userId);
+      if (!result.queued) await reload();
       setModal(null);
-      showToast(modal === 'taskEdit' ? 'Задача обновлена' : 'Задача создана');
+      showToast(result.queued ? 'Нет сети: задача сохранена в очереди' : modal === 'taskEdit' ? 'Задача обновлена' : 'Задача создана');
     } catch (requestError) {
       setFormError(requestError.message || 'Не удалось создать задачу');
     } finally {
@@ -309,17 +322,21 @@ export default function PlatformManagerPage() {
     setSubmitting(true);
     setFormError('');
     try {
+      let queued = false;
       if (actionTarget.type === 'cancelShift') {
-        await managerApi.cancelShift(actionTarget.item.id, { version: actionTarget.item.version, reason: actionReason.trim() });
-        showToast('Смена отменена, сотрудники уведомлены');
+        const result = await submitManagerMutation('shift.cancel', { shiftId: actionTarget.item.id, body: { version: actionTarget.item.version, reason: actionReason.trim() } }, userId);
+        queued = result.queued;
+        showToast(result.queued ? 'Отмена смены сохранена в очереди' : 'Смена отменена, сотрудники уведомлены');
       } else if (actionTarget.type === 'removeAssignment') {
-        await managerApi.removeShiftAssignment(actionTarget.item.id, actionTarget.userId, { version: actionTarget.item.version, reason: actionReason.trim() || undefined });
-        showToast('Сотрудник снят со смены');
+        const result = await submitManagerMutation('shift.unassign', { shiftId: actionTarget.item.id, userId: actionTarget.userId, body: { version: actionTarget.item.version, reason: actionReason.trim() || undefined } }, userId);
+        queued = result.queued;
+        showToast(result.queued ? 'Изменение состава сохранено в очереди' : 'Сотрудник снят со смены');
       } else if (actionTarget.type === 'deleteTask') {
-        await managerApi.deleteTask(actionTarget.item.id, { version: actionTarget.item.version, reason: actionReason.trim() || undefined });
-        showToast('Задача удалена из работы');
+        const result = await submitManagerMutation('task.delete', { taskId: actionTarget.item.id, body: { version: actionTarget.item.version, reason: actionReason.trim() || undefined } }, userId);
+        queued = result.queued;
+        showToast(result.queued ? 'Отмена задачи сохранена в очереди' : 'Задача удалена из работы');
       }
-      await reload();
+      if (!queued) await reload();
       setActionTarget(null);
     } catch (requestError) {
       setFormError(requestError.message || 'Не удалось выполнить действие');

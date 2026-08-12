@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { LEGACY_HOME_ROUTE_BY_ROLE, ROLE_MANAGER } from '../constants/roles';
 import {
   createPlatformNavigation,
   createPlatformMobileNavigation,
@@ -9,6 +10,10 @@ import {
 } from '../platform/platformConfig';
 
 describe('staff platform route contract', () => {
+  test('manager has no circular link back to the same platform', () => {
+    expect(LEGACY_HOME_ROUTE_BY_ROLE[ROLE_MANAGER]).toBeUndefined();
+  });
+
   test('route constants are unique and stay under /app', () => {
     const routes = Object.values(PLATFORM_ROUTES);
     expect(new Set(routes).size).toBe(routes.length);
