@@ -6,7 +6,7 @@ import Toast from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifyStore } from '../../store/notifyStore';
 import { initials } from '../../utils/format';
-import { LEGACY_HOME_ROUTE_BY_ROLE } from '../../constants/roles';
+import { LEGACY_HOME_ROUTE_BY_ROLE, ROLE_ADMIN } from '../../constants/roles';
 import { usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
 import {
@@ -28,14 +28,16 @@ function usePlatformNav() {
     state.tasks.filter((task) => !task.done).length
   ));
   const permissions = usePlatformStore((state) => state.permissions);
-  return createPlatformNavigation(p, pendingTaskCount, permissions);
+  const role = useAuthStore((state) => state.user?.role);
+  return createPlatformNavigation(p, pendingTaskCount, role === ROLE_ADMIN ? ['*'] : permissions);
 }
 
 function usePlatformMobileNav() {
   const { p } = usePlatformCopy();
   const pendingTaskCount = usePlatformStore((state) => state.tasks.filter((task) => !task.done).length);
   const permissions = usePlatformStore((state) => state.permissions);
-  return createPlatformMobileNavigation(p, pendingTaskCount, permissions);
+  const role = useAuthStore((state) => state.user?.role);
+  return createPlatformMobileNavigation(p, pendingTaskCount, role === ROLE_ADMIN ? ['*'] : permissions);
 }
 
 function PlatformSidebar() {

@@ -9,6 +9,8 @@ export const PLATFORM_ROUTES = Object.freeze({
   hr: '/app/hr',
   finance: '/app/finance',
   operations: '/app/operations',
+  admin: '/app/admin',
+  adminWriteoffs: '/app/admin/writeoffs',
   profile: '/app/profile',
   notifications: '/app/notifications',
   support: '/app/support',
@@ -40,6 +42,7 @@ const EMPLOYEE_SERVICE_ROUTES = [
 ];
 
 export function isSecondaryPlatformRoute(pathname) {
+  if (pathname.startsWith(`${PLATFORM_ROUTES.adminWriteoffs}/`)) return true;
   return SECONDARY_PLATFORM_ROUTES.some((route) => (
     pathname === route || pathname.startsWith(`${route}/`)
   ));
@@ -52,6 +55,7 @@ export function isEmployeeServiceRoute(pathname) {
 }
 
 export function getPlatformBackRoute(pathname) {
+  if (pathname.startsWith(`${PLATFORM_ROUTES.adminWriteoffs}/`)) return PLATFORM_ROUTES.adminWriteoffs;
   if (pathname.startsWith(`${PLATFORM_ROUTES.learning}/`)) return PLATFORM_ROUTES.learning;
   if ([PLATFORM_ROUTES.learning, PLATFORM_ROUTES.documents, PLATFORM_ROUTES.leave, PLATFORM_ROUTES.support].includes(pathname)) {
     return PLATFORM_ROUTES.services;
@@ -85,7 +89,18 @@ export function canUseOperationsWorkspace(permissions = []) {
   return permissions.includes('operations.workspace');
 }
 
+export function canUseSystemAdmin(permissions = []) {
+  return permissions.includes('*');
+}
+
 export function createPlatformNavigation(copy, pendingTaskCount = 0, permissions = []) {
+  if (canUseSystemAdmin(permissions)) {
+    return [
+      { to: PLATFORM_ROUTES.admin, end: true, icon: 'sliders', label: copy.admin_workspace },
+      { to: PLATFORM_ROUTES.adminWriteoffs, icon: 'queue', label: copy.writeoffs_queue },
+      { to: PLATFORM_ROUTES.home, end: true, icon: 'grid', label: copy.platform },
+    ];
+  }
   const navigation = [
     { to: PLATFORM_ROUTES.home, end: true, icon: 'home', label: copy.today },
     ...(canUseReviewerControl(permissions) ? [{ to: PLATFORM_ROUTES.control, icon: 'shieldCheck', label: copy.control }] : []),
@@ -179,6 +194,8 @@ export function getPlatformRouteTitle(pathname, copy) {
     [PLATFORM_ROUTES.hr]: copy.hr_workspace,
     [PLATFORM_ROUTES.finance]: copy.finance_workspace,
     [PLATFORM_ROUTES.operations]: copy.operations_workspace,
+    [PLATFORM_ROUTES.admin]: copy.admin_workspace,
+    [PLATFORM_ROUTES.adminWriteoffs]: copy.writeoffs_queue,
     [PLATFORM_ROUTES.profile]: copy.profile,
     [PLATFORM_ROUTES.notifications]: copy.notifications,
     [PLATFORM_ROUTES.support]: copy.support,
@@ -192,7 +209,7 @@ export function getPlatformRouteTitle(pathname, copy) {
   const exactTitle = titles[pathname];
   if (exactTitle) return exactTitle;
 
-  const parentRoute = Object.keys(titles).find((route) => pathname.startsWith(`${route}/`));
+  const parentRoute = Object.keys(titles).sort((a, b) => b.length - a.length).find((route) => pathname.startsWith(`${route}/`));
   return titles[parentRoute] || copy.platform;
 }
 

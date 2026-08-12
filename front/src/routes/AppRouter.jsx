@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Navigate, Routes, Route } from 'react-router-dom';
 import AppShell from '../components/layout/AppShell';
 import Spinner from '../components/ui/Spinner';
 import { RequireAuth, RequireRole, GuestOnly } from './guards';
@@ -84,6 +84,9 @@ export default function AppRouter() {
         <Route path="hr" element={hr(platformPage(<PlatformHrPage />))} />
         <Route path="finance" element={finance(platformPage(<PlatformFinancePage />))} />
         <Route path="operations" element={operations(platformPage(<PlatformOperationsPage />))} />
+        <Route path="admin" element={admin(<AdminPage />)} />
+        <Route path="admin/writeoffs" element={admin(<ReviewQueuePage basePath={PLATFORM_ROUTES.adminWriteoffs} />)} />
+        <Route path="admin/writeoffs/:id" element={admin(<ReviewDetailPage basePath={PLATFORM_ROUTES.adminWriteoffs} />)} />
         <Route path="profile" element={platformPage(<PlatformProfilePage />)} />
         <Route path="notifications" element={platformPage(<PlatformNotificationsPage />)} />
         <Route path="support" element={platformPage(<PlatformSupportPage />)} />
@@ -96,6 +99,9 @@ export default function AppRouter() {
         <Route path="writeoff" element={sender(<CreateWriteOffPage exitPath={PLATFORM_ROUTES.home} successPath={PLATFORM_ROUTES.tasks} />)} />
         <Route path="*" element={platformPage(<PlatformComingSoonPage />)} />
       </Route>
+
+      {/* Старые закладки администратора ведут в единый кабинет Staff Platform. */}
+      <Route path="/admin" element={<RequireAuth>{admin(<Navigate to={PLATFORM_ROUTES.admin} replace />)}</RequireAuth>} />
 
       <Route
         element={
@@ -114,9 +120,6 @@ export default function AppRouter() {
         <Route path="/review" element={reviewer(<ReviewQueuePage />)} />
         <Route path="/review/history" element={reviewer(<ReviewHistoryPage />)} />
         <Route path="/review/:id" element={reviewer(<ReviewDetailPage />)} />
-
-        {/* Администратор */}
-        <Route path="/admin" element={admin(<AdminPage />)} />
 
         {/* Общее */}
         <Route path="/notifications" element={<NotificationsPage />} />

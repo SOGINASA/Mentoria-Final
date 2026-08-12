@@ -109,13 +109,21 @@ describe('staff platform route contract', () => {
 
   test('AppRouter declares every platform destination', () => {
     const source = fs.readFileSync(require.resolve('./AppRouter'), 'utf8');
-    const routeSegments = ['', 'shifts', 'income', 'tasks', 'approvals', 'management', 'control', 'hr', 'finance', 'operations', 'profile', 'notifications', 'support', 'news', 'services', 'learning', 'documents', 'leave', 'writeoff'];
+    const routeSegments = ['', 'shifts', 'income', 'tasks', 'approvals', 'management', 'control', 'hr', 'finance', 'operations', 'admin', 'profile', 'notifications', 'support', 'news', 'services', 'learning', 'documents', 'leave', 'writeoff'];
 
     expect(source).toContain('path="/app"');
     routeSegments.filter(Boolean).forEach((segment) => {
       expect(source).toContain(`path="${segment}"`);
     });
     expect(source).toContain('exitPath={PLATFORM_ROUTES.home}');
+  });
+
+  test('administrator receives one unified platform navigation', () => {
+    const copy = { admin_workspace: 'Администрирование', writeoffs_queue: 'Очередь', platform: 'Платформа' };
+    expect(createPlatformNavigation(copy, 0, ['*']).map((item) => item.to)).toEqual([
+      PLATFORM_ROUTES.admin, PLATFORM_ROUTES.adminWriteoffs, PLATFORM_ROUTES.home,
+    ]);
+    expect(createPlatformMobileNavigation(copy, 0, ['*'])).toHaveLength(3);
   });
 
   test('deep service routes have a predictable parent route', () => {
