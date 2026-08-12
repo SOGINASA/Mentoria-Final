@@ -74,7 +74,7 @@ export default function PlatformManagerPage() {
   const showToast = useUiStore((state) => state.showToast);
   const userId = useAuthStore((state) => state.user?.id);
   const [workspace, setWorkspace] = useState({ stores: [], team: [], shifts: [], tasks: [] });
-  const [storeFilter, setStoreFilter] = useState('all');
+  const [storeFilter, setStoreFilter] = useState(() => new URLSearchParams(window.location.search).get('store_id') || 'all');
   const [tab, setTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

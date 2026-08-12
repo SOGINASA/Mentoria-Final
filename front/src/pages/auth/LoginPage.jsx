@@ -15,6 +15,8 @@ const DEMO = {
   sender: { identifier: 'sender1', password: 'sender123' },
   manager: { identifier: 'manager', password: 'manager123' },
   hr: { identifier: 'hr', password: 'hr123' },
+  finance: { identifier: 'finance', password: 'finance123' },
+  operations: { identifier: 'operations', password: 'operations123' },
   reviewer: { identifier: 'reviewer', password: 'reviewer123' },
   admin: { identifier: 'admin', password: 'admin12345' },
 };
@@ -220,6 +222,20 @@ export default function LoginPage() {
                 className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
               >
                 {t.role_hr}
+              </button>
+              <button
+                type="button"
+                onClick={() => submit(DEMO.finance)}
+                className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
+              >
+                {t.role_finance}
+              </button>
+              <button
+                type="button"
+                onClick={() => submit(DEMO.operations)}
+                className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
+              >
+                {t.role_operations}
               </button>
               <button
                 type="button"

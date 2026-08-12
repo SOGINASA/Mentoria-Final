@@ -81,6 +81,29 @@ describe('staff platform route contract', () => {
     expect(mobile.some((item) => item.to === PLATFORM_ROUTES.management)).toBe(false);
   });
 
+  test('Finance receives only the finance workspace and employee services', () => {
+    const copy = {
+      today: 'Сегодня', finance_workspace: 'Финансы', approvals: 'Согласования',
+      shifts: 'Смены', income: 'Доход', tasks: 'Задачи', services: 'Сервисы',
+    };
+    const mobile = createPlatformMobileNavigation(copy, 0, ['finance.workspace', 'income.read']);
+    expect(mobile.map((item) => item.to)).toEqual([
+      PLATFORM_ROUTES.home, PLATFORM_ROUTES.finance, PLATFORM_ROUTES.services,
+    ]);
+  });
+
+  test('Operations receives network control, management and approvals', () => {
+    const copy = {
+      today: 'Сегодня', operations_workspace: 'Операции', management: 'Управление',
+      approvals: 'Согласования', shifts: 'Смены', income: 'Доход', tasks: 'Задачи', services: 'Сервисы',
+    };
+    const permissions = ['operations.workspace', 'manager.queue', 'shifts.manage', 'tasks.manage'];
+    expect(createPlatformMobileNavigation(copy, 0, permissions).map((item) => item.to)).toEqual([
+      PLATFORM_ROUTES.home, PLATFORM_ROUTES.operations, PLATFORM_ROUTES.management,
+      PLATFORM_ROUTES.approvals, PLATFORM_ROUTES.services,
+    ]);
+  });
+
   test('income remains discoverable while payroll integration is unavailable', () => {
     const copy = {
       today: 'Сегодня', shifts: 'Смены', income: 'Доход', tasks: 'Задачи', services: 'Сервисы',
@@ -91,7 +114,7 @@ describe('staff platform route contract', () => {
 
   test('AppRouter declares every platform destination', () => {
     const source = fs.readFileSync(require.resolve('./AppRouter'), 'utf8');
-    const routeSegments = ['', 'shifts', 'income', 'tasks', 'approvals', 'management', 'control', 'hr', 'profile', 'notifications', 'support', 'news', 'services', 'learning', 'documents', 'leave', 'writeoff'];
+    const routeSegments = ['', 'shifts', 'income', 'tasks', 'approvals', 'management', 'control', 'hr', 'finance', 'operations', 'profile', 'notifications', 'support', 'news', 'services', 'learning', 'documents', 'leave', 'writeoff'];
 
     expect(source).toContain('path="/app"');
     routeSegments.filter(Boolean).forEach((segment) => {

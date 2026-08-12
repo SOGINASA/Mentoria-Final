@@ -122,7 +122,7 @@ def create_app(config_object=None):
         notifications_bp, webauthn_bp,
         platform_bp, shifts_bp, time_tracking_bp, tasks_bp, cases_bp, news_bp,
         manager_bp, admin_platform_bp,
-        employee_services_bp, hr_bp,
+        employee_services_bp, hr_bp, finance_bp, operations_bp,
     )
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(stores_bp, url_prefix='/api/stores')
@@ -141,6 +141,8 @@ def create_app(config_object=None):
     app.register_blueprint(admin_platform_bp, url_prefix='/api/admin/platform')
     app.register_blueprint(employee_services_bp, url_prefix='/api/employee-services')
     app.register_blueprint(hr_bp, url_prefix='/api/hr')
+    app.register_blueprint(finance_bp, url_prefix='/api/finance')
+    app.register_blueprint(operations_bp, url_prefix='/api/operations')
 
     _register_misc_routes(app)
     _register_error_handlers(app)
