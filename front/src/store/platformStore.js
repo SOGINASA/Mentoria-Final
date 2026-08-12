@@ -114,9 +114,14 @@ export const usePlatformStore = create(
         set({ loading: true, error: null });
         try {
           const bootstrap = await platformApi.bootstrap();
+          const flags = bootstrap.feature_flags || {};
+          const platformEnabled = flags.staff_platform !== false;
           const [open, requests, cases, news, timecards] = await Promise.all([
-            shiftsApi.listOpen(), shiftsApi.listRequests(), casesApi.list(), newsApi.list(),
-            timeApi.listTimecards(),
+            platformEnabled && flags.shifts !== false ? shiftsApi.listOpen() : Promise.resolve({ shifts: [] }),
+            platformEnabled && flags.shifts !== false ? shiftsApi.listRequests() : Promise.resolve({ requests: [] }),
+            platformEnabled && flags.support_cases !== false ? casesApi.list() : Promise.resolve({ cases: [] }),
+            platformEnabled && flags.news !== false ? newsApi.list() : Promise.resolve({ news: [] }),
+            platformEnabled && flags.time_tracking !== false ? timeApi.listTimecards() : Promise.resolve({ timecards: [] }),
           ]);
           const state = bootstrap.time_tracking?.state || 'idle';
           const employeeServices = bootstrap.employee_services || {};
@@ -130,7 +135,7 @@ export const usePlatformStore = create(
             supportTickets: cases.cases || [],
             news: news.news || [],
             timecards: timecards.timecards || [],
-            featureFlags: bootstrap.feature_flags || {},
+            featureFlags: flags,
             permissions: bootstrap.permissions || [],
             contactDetails: {
               phone: bootstrap.user?.phone || '',

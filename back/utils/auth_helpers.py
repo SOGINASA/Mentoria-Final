@@ -57,3 +57,24 @@ def permission_required(permission):
             return fn(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def feature_required(feature):
+    """Require an enabled staff-platform feature for the current user."""
+    from services.feature_flags import feature_enabled_for_user
+
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            verify_jwt_in_request()
+            user = get_current_user()
+            if not user or not user.is_active:
+                return jsonify({'error': 'Пользователь не найден или деактивирован'}), 401
+            if not feature_enabled_for_user(user, feature):
+                return jsonify({
+                    'error': 'Функция отключена администратором',
+                    'feature': feature,
+                }), 403
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator

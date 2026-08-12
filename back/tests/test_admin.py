@@ -1,4 +1,8 @@
-"""Тесты админ-эндпоинтов: видимость деактивированных точек/сотрудников."""
+"""Тесты административных эндпоинтов и системных настроек."""
+
+from constants import ROLE_SENDER
+from models import User, db
+from platform_models import AuditEvent
 
 
 def test_admin_stores_include_inactive(client, admin, store, auth):
@@ -73,3 +77,69 @@ def test_admin_audit_supports_filters_and_enriched_actor(client, admin, auth):
     assert data['pagination']['total'] == 1
     assert data['events'][0]['actor_name'] == admin.full_name
     assert data['events'][0]['action'] == 'feature_flag.updated'
+
+
+def test_admin_can_update_clear_and_validate_user_email(client, admin, sender, auth):
+    headers = auth(admin)
+
+    updated = client.put(f'/api/admin/users/{sender.id}', headers=headers, json={
+        'email': 'New.Address@Bahandi.KZ',
+    })
+    assert updated.status_code == 200
+    assert updated.get_json()['user']['email'] == 'new.address@bahandi.kz'
+
+    duplicate = User(username='other-sender', full_name='Другой сотрудник',
+                     role=ROLE_SENDER, store_id=sender.store_id,
+                     email='occupied@bahandi.kz')
+    duplicate.set_password('secret123')
+    db.session.add(duplicate)
+    db.session.commit()
+    response = client.put(f'/api/admin/users/{sender.id}', headers=headers,
+                          json={'email': 'occupied@bahandi.kz'})
+    assert response.status_code == 400
+
+    cleared = client.put(f'/api/admin/users/{sender.id}', headers=headers, json={'email': ''})
+    assert cleared.status_code == 200
+    assert cleared.get_json()['user']['email'] is None
+
+
+def test_admin_cannot_deactivate_or_demote_own_account(client, admin, auth):
+    headers = auth(admin)
+    assert client.delete(f'/api/admin/users/{admin.id}', headers=headers).status_code == 400
+    response = client.put(f'/api/admin/users/{admin.id}', headers=headers, json={
+        'role': ROLE_SENDER, 'store_id': 1,
+    })
+    assert response.status_code == 400
+    db.session.refresh(admin)
+    assert admin.is_active is True
+    assert admin.role == 'admin'
+
+
+def test_admin_crud_is_recorded_in_audit_log(client, admin, auth):
+    response = client.post('/api/admin/stores', headers=auth(admin), json={
+        'name': 'Новая точка',
+    })
+    assert response.status_code == 201
+    store_id = response.get_json()['store']['id']
+    event = AuditEvent.query.filter_by(action='admin.store_created', entity_id=store_id).one()
+    assert event.actor_id == admin.id
+    assert event.store_id == store_id
+
+
+def test_disabled_feature_blocks_its_backend(client, admin, sender, auth):
+    response = client.put('/api/admin/platform/feature-flags/tasks', headers=auth(admin), json={
+        'enabled_by_default': False,
+    })
+    assert response.status_code == 200
+    blocked = client.get('/api/tasks', headers=auth(sender))
+    assert blocked.status_code == 403
+    assert blocked.get_json()['feature'] == 'tasks'
+
+
+def test_overview_does_not_claim_unimplemented_iiko_is_connected(
+        app, client, admin, auth):
+    app.config.update(IIKO_MODE='real', IIKO_BASE_URL='https://iiko.example.test')
+    response = client.get('/api/admin/platform/overview', headers=auth(admin))
+    integration = response.get_json()['integrations'][0]
+    assert integration['status'] == 'unavailable'
+    assert 'не реализована' in integration['detail']

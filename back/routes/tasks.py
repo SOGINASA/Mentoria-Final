@@ -11,10 +11,16 @@ from services.audit import audit
 from services.idempotency import idempotent_mutation
 from services.notifications import notify
 from services.permissions import can_access_store
-from utils.auth_helpers import get_current_user, permission_required
+from utils.auth_helpers import feature_required, get_current_user, permission_required
 from utils.platform_helpers import expected_version, parse_datetime, utcnow
 
 tasks_bp = Blueprint('tasks', __name__)
+
+
+@tasks_bp.before_request
+@feature_required('tasks')
+def require_tasks_feature():
+    pass
 
 
 def _visible_to(task, user):

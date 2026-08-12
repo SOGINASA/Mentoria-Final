@@ -14,10 +14,16 @@ from services.employee_services import (
 )
 from services.notifications import notify
 from services.permissions import can_access_store, has_permission, scoped_store_ids
-from utils.auth_helpers import get_current_user, permission_required
+from utils.auth_helpers import feature_required, get_current_user, permission_required
 from utils.platform_helpers import expected_version, utcnow
 
 employee_services_bp = Blueprint('employee_services', __name__)
+
+
+@employee_services_bp.before_request
+@feature_required('hr_services')
+def require_hr_services_feature():
+    pass
 
 
 def _parse_date(value, field):

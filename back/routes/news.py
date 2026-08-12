@@ -8,10 +8,16 @@ from platform_models import NewsPost, NewsRead
 from services.audit import audit
 from services.idempotency import idempotent_mutation
 from services.permissions import can_access_store, has_permission, scoped_store_ids
-from utils.auth_helpers import get_current_user, permission_required
+from utils.auth_helpers import feature_required, get_current_user, permission_required
 from utils.platform_helpers import parse_datetime, utcnow
 
 news_bp = Blueprint('news', __name__)
+
+
+@news_bp.before_request
+@feature_required('news')
+def require_news_feature():
+    pass
 
 
 @news_bp.get('')

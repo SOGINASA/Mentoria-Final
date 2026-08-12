@@ -6,7 +6,13 @@ import pytest
 
 from constants import ROLE_HR, ROLE_MANAGER, ROLE_SENDER
 from models import Notification, Store, User, db
-from platform_models import AuditEvent, EmployeeDocumentRequest, LeaveRequest
+from platform_models import AuditEvent, EmployeeDocumentRequest, FeatureFlag, LeaveRequest
+
+
+@pytest.fixture(autouse=True)
+def enable_employee_services(app):
+    db.session.add(FeatureFlag(key='hr_services', enabled_by_default=True))
+    db.session.commit()
 
 
 @pytest.fixture()

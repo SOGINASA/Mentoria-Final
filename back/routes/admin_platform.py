@@ -8,6 +8,7 @@ from models import Employee, Store, User, db
 from platform_models import AuditEvent, FeatureFlag, FeatureFlagTarget, UserStoreScope
 from services.audit import audit
 from services.feature_flags import DEFAULT_FLAGS
+from services.iiko_service import REAL_INTEGRATION_AVAILABLE
 from utils.auth_helpers import get_current_user, role_required
 
 admin_platform_bp = Blueprint('admin_platform', __name__)
@@ -66,8 +67,19 @@ def overview():
         issues.append({'key': 'missing_iiko', 'count': missing_iiko,
                        'title': 'У активных точек не указан ID iiko', 'target': 'stores'})
 
-    iiko_connected = (current_app.config.get('IIKO_MODE') == 'real'
-                      and bool(current_app.config.get('IIKO_BASE_URL')))
+    iiko_real_mode = current_app.config.get('IIKO_MODE') == 'real'
+    iiko_configured = iiko_real_mode and bool(current_app.config.get('IIKO_BASE_URL'))
+    iiko_connected = iiko_configured and REAL_INTEGRATION_AVAILABLE
+    if iiko_connected:
+        iiko_status = 'connected'
+        iiko_detail = 'Реальная интеграция настроена'
+    elif iiko_real_mode:
+        iiko_status = 'unavailable'
+        iiko_detail = ('Реальный режим настроен, но отправка актов в iiko '
+                       'ещё не реализована')
+    else:
+        iiko_status = 'mock'
+        iiko_detail = 'Тестовый режим — данные не отправляются в iiko'
     return jsonify({
         'users': {'total': total_users, 'active': active_users,
                   'inactive': total_users - active_users, 'by_role': role_counts},
@@ -80,9 +92,8 @@ def overview():
         ]},
         'integrations': [{
             'key': 'iiko', 'name': 'iiko',
-            'status': 'connected' if iiko_connected else 'mock',
-            'detail': ('Реальная интеграция настроена' if iiko_connected
-                       else 'Тестовый режим — данные не отправляются в iiko'),
+            'status': iiko_status,
+            'detail': iiko_detail,
         }],
         'issues': issues,
     })

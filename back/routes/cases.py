@@ -10,10 +10,16 @@ from services.audit import audit
 from services.idempotency import idempotent_mutation
 from services.notifications import notify
 from services.permissions import can_access_store, has_permission
-from utils.auth_helpers import get_current_user
+from utils.auth_helpers import feature_required, get_current_user
 from utils.platform_helpers import utcnow
 
 cases_bp = Blueprint('cases', __name__)
+
+
+@cases_bp.before_request
+@feature_required('support_cases')
+def require_support_cases_feature():
+    pass
 
 
 def _can_manage(user, case):

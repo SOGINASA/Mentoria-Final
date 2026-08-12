@@ -52,6 +52,25 @@ describe('platformStore', () => {
     expect(state.openShifts).toEqual([{ id: 3 }]);
   });
 
+  test('does not request APIs for disabled features', async () => {
+    platformApi.bootstrap.mockResolvedValue({
+      user: {}, shifts: [], tasks: [], time_tracking: { state: 'idle' },
+      feature_flags: {
+        staff_platform: true, shifts: false, time_tracking: false,
+        support_cases: false, news: false, hr_services: false,
+      },
+      permissions: [], employee_services: {},
+    });
+
+    await usePlatformStore.getState().hydrate();
+
+    expect(shiftsApi.listOpen).not.toHaveBeenCalled();
+    expect(shiftsApi.listRequests).not.toHaveBeenCalled();
+    expect(casesApi.list).not.toHaveBeenCalled();
+    expect(newsApi.list).not.toHaveBeenCalled();
+    expect(timeApi.listTimecards).not.toHaveBeenCalled();
+  });
+
   test('persists a support case returned by backend', async () => {
     casesApi.create.mockResolvedValue({
       case: { id: 7, reference: 'BH-S-000007', category: 'schedule' },

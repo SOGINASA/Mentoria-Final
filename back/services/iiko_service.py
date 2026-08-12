@@ -16,6 +16,8 @@ from typing import Optional
 
 from flask import current_app
 
+REAL_INTEGRATION_AVAILABLE = False
+
 
 @dataclass
 class IikoResult:

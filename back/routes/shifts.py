@@ -13,10 +13,16 @@ from services.audit import audit
 from services.idempotency import idempotent_mutation
 from services.notifications import notify
 from services.permissions import can_access_store
-from utils.auth_helpers import get_current_user, permission_required
+from utils.auth_helpers import feature_required, get_current_user, permission_required
 from utils.platform_helpers import expected_version, parse_datetime, utcnow
 
 shifts_bp = Blueprint('shifts', __name__)
+
+
+@shifts_bp.before_request
+@feature_required('shifts')
+def require_shifts_feature():
+    pass
 
 
 def _overlap(user_id, starts_at, ends_at, exclude_shift_id=None):

@@ -6,6 +6,7 @@ import Icon from '../../components/ui/Icon';
 import BottomSheet from '../../components/ui/BottomSheet';
 import { useI18n } from '../../i18n/useI18n';
 import { useUiStore } from '../../store/uiStore';
+import { useAuthStore } from '../../store/authStore';
 import * as adminApi from '../../api/admin.api';
 import { listUsers, listStores, listEmployees } from '../../api/admin.api';
 import { initials } from '../../utils/format';
@@ -31,6 +32,7 @@ const ROLE_BADGE = {
 export default function AdminPage() {
   const { t } = useI18n();
   const showToast = useUiStore((s) => s.showToast);
+  const currentUserId = useAuthStore((s) => s.user?.id);
 
   const [tab, setTab] = useState('overview');
   const [users, setUsers] = useState([]);
@@ -192,7 +194,7 @@ export default function AdminPage() {
                 sub={`@${u.username}${u.store?.name ? ` · ${u.store.name}` : ''}`}
                 badge={{ label: roleLabel(u.role), ...ROLE_BADGE[u.role] }}
                 onEdit={() => setSheet({ mode: 'edit', entity: u })}
-                onDeactivate={u.is_active ? () => onDeactivate('users', u.id) : null}
+                onDeactivate={u.is_active && u.id !== currentUserId ? () => onDeactivate('users', u.id) : null}
               />
             ))}
           {tab === 'stores' &&
@@ -229,6 +231,7 @@ export default function AdminPage() {
           entity={sheet.entity}
           stores={stores}
           employees={employees}
+          currentUserId={currentUserId}
           onClose={() => setSheet(null)}
           onSaved={() => {
             setSheet(null);
@@ -281,10 +284,12 @@ function Row({ active, avatar, icon, title, sub, badge, onEdit, onDeactivate }) 
 }
 
 // ---------- Форма создания/редактирования ----------
-function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
+function AdminForm({ tab, mode, entity, stores, employees, currentUserId, onClose, onSaved }) {
   const { t } = useI18n();
   const showToast = useUiStore((s) => s.showToast);
   const isEdit = mode === 'edit';
+  const isCurrentAdmin = tab === 'users' && isEdit
+    && entity?.id === currentUserId && entity?.role === ROLE_ADMIN;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -332,6 +337,7 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
     if (!isEdit && !/^[A-Za-z0-9._-]{3,30}$/.test(form.username.trim())) errors.username = '3–30 символов: латиница, цифры, точка, _ или -';
     if (!isEdit && form.password.length < 6) errors.password = 'Минимум 6 символов';
     if (isEdit && form.password && form.password.length < 6) errors.password = 'Минимум 6 символов';
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.email = 'Укажите корректный email';
     if ([ROLE_SENDER, ROLE_MANAGER].includes(form.role) && !form.store_id) errors.store_id = 'Для сотрудника и менеджера выберите торговую точку';
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
@@ -352,8 +358,8 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
           role: form.role,
           store_id: storeId,
           employee_id: form.role === ROLE_SENDER && form.employee_id !== '' ? Number(form.employee_id) : null,
-          email: form.email || undefined,
-          phone: form.phone || undefined,
+          email: form.email.trim() || null,
+          phone: form.phone.trim() || null,
           supervised_store_ids: form.role === ROLE_REVIEWER ? form.scope_store_ids : [],
           is_active: form.is_active,
         };
@@ -441,7 +447,7 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
               autoComplete="new-password"
               action={<button type="button" onClick={() => setShowPassword((value) => !value)} className="min-h-11 rounded-xl px-3 text-[12px] font-bold text-green hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">{showPassword ? 'Скрыть' : 'Показать'}</button>}
             />
-            <RoleChips value={form.role} onChange={(r) => setForm((f) => ({ ...f, role: r }))} t={t} />
+            <RoleChips value={form.role} onChange={(r) => setForm((f) => ({ ...f, role: r }))} t={t} disabled={isCurrentAdmin} />
             {storeOptions}
             {form.role === ROLE_SENDER && (
               <Select label={t.f_self_employee} value={form.employee_id} onChange={set('employee_id')}>
@@ -460,9 +466,9 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
                 onChange={(scopeStoreIds) => setForm((current) => ({ ...current, scope_store_ids: scopeStoreIds }))}
               />
             )}
-            <Field label={t.f_email} value={form.email} onChange={set('email')} />
+            <Field label={t.f_email} value={form.email} onChange={set('email')} error={fieldErrors.email} />
             <Field label={t.f_phone} value={form.phone} onChange={set('phone')} />
-            {isEdit && <ActiveToggle label={t.admin_active} checked={form.is_active} onChange={(v) => setForm((f) => ({ ...f, is_active: v }))} />}
+            {isEdit && <ActiveToggle label={t.admin_active} checked={form.is_active} disabled={isCurrentAdmin} onChange={(v) => setForm((f) => ({ ...f, is_active: v }))} />}
           </>
         )}
 
@@ -519,7 +525,7 @@ function Field({ label, value, onChange, type = 'text', hint, error, action, ...
 }
 
 // Явный выбор роли пользователя — чипы (создание и редактирование).
-function RoleChips({ value, onChange, t }) {
+function RoleChips({ value, onChange, t, disabled = false }) {
   const roles = [
     { key: ROLE_SENDER, label: t.role_sender },
     { key: ROLE_MANAGER, label: 'Менеджер' },
@@ -540,8 +546,9 @@ function RoleChips({ value, onChange, t }) {
             <button
               key={r.key}
               type="button"
+              disabled={disabled}
               onClick={() => onChange(r.key)}
-              className="h-10 rounded-xl border-[1.5px] font-semibold text-[12px] leading-tight px-1 cursor-pointer transition"
+              className="h-10 rounded-xl border-[1.5px] font-semibold text-[12px] leading-tight px-1 cursor-pointer transition disabled:cursor-not-allowed disabled:opacity-60"
               style={{
                 background: active ? c.bg : 'var(--surface)',
                 color: active ? c.fg : 'var(--muted)',
@@ -557,12 +564,13 @@ function RoleChips({ value, onChange, t }) {
   );
 }
 
-function ActiveToggle({ label, checked, onChange }) {
+function ActiveToggle({ label, checked, onChange, disabled = false }) {
   return (
     <label className="flex items-center gap-2.5 cursor-pointer mt-1">
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         className="w-4 h-4 accent-[var(--green)]"
       />

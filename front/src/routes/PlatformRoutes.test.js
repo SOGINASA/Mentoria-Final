@@ -104,12 +104,17 @@ describe('staff platform route contract', () => {
     ]);
   });
 
-  test('income remains discoverable while payroll integration is unavailable', () => {
+  test('disabled modules are removed from platform navigation', () => {
     const copy = {
       today: 'Сегодня', shifts: 'Смены', income: 'Доход', tasks: 'Задачи', services: 'Сервисы',
     };
 
-    expect(createPlatformNavigation(copy).some((item) => item.to === PLATFORM_ROUTES.income)).toBe(true);
+    const navigation = createPlatformNavigation(copy, 0, [], {
+      staff_platform: true, shifts: true, income: false, tasks: false, hr_services: false,
+    });
+    expect(navigation.map((item) => item.to)).toEqual([
+      PLATFORM_ROUTES.home, PLATFORM_ROUTES.shifts,
+    ]);
   });
 
   test('AppRouter declares every platform destination', () => {

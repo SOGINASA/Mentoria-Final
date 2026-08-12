@@ -36,6 +36,8 @@ export default function PlatformHomePage() {
   const shifts = usePlatformStore((state) => state.shifts);
   const tasks = usePlatformStore((state) => state.tasks);
   const timecards = usePlatformStore((state) => state.timecards);
+  const featureFlags = usePlatformStore((state) => state.featureFlags);
+  const featureEnabled = (key) => featureFlags.staff_platform !== false && featureFlags[key] !== false;
 
   const date = new Intl.DateTimeFormat(lang === 'kz' ? 'kk-KZ' : 'ru-RU', {
     weekday: 'long', day: 'numeric', month: 'long',
@@ -47,11 +49,11 @@ export default function PlatformHomePage() {
     .reduce((total, card) => total + (card.worked_minutes || 0), 0);
 
   const quickActions = [
-    { title: p.open_schedule, icon: 'calendar', tone: 'green', to: PLATFORM_ROUTES.shifts },
-    { title: p.services, icon: 'grid', tone: 'orange', to: PLATFORM_ROUTES.services },
+    { title: p.open_schedule, icon: 'calendar', tone: 'green', to: PLATFORM_ROUTES.shifts, feature: 'shifts' },
+    { title: p.services, icon: 'grid', tone: 'orange', to: PLATFORM_ROUTES.services, feature: 'hr_services' },
     { title: p.writeoff, icon: 'camera', tone: 'amber', to: PLATFORM_ROUTES.writeoff },
-    { title: p.ask_help, icon: 'helpCircle', tone: 'green', to: PLATFORM_ROUTES.support },
-  ];
+    { title: p.ask_help, icon: 'helpCircle', tone: 'green', to: PLATFORM_ROUTES.support, feature: 'support_cases' },
+  ].filter((action) => !action.feature || featureEnabled(action.feature));
 
   async function toggleShift() {
     try {
@@ -76,7 +78,7 @@ export default function PlatformHomePage() {
       />
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.75fr)]">
-        <PlatformCard variant="brand" className="relative overflow-hidden p-5 shadow-card sm:p-6">
+        {featureEnabled('shifts') && <PlatformCard variant="brand" className="relative overflow-hidden p-5 shadow-card sm:p-6">
           <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/10" />
           <div className="pointer-events-none absolute -bottom-24 right-20 h-48 w-48 rounded-full bg-orange/20" />
           <div className="relative z-[1]">
@@ -112,7 +114,7 @@ export default function PlatformHomePage() {
                 <Icon name="users" size={17} />
                 <span>{p.team_today}</span>
               </div>
-              <button
+              {featureEnabled('time_tracking') && <button
                 type="button"
                 onClick={toggleShift}
                 disabled={!todayShift && !shiftActive}
@@ -120,12 +122,12 @@ export default function PlatformHomePage() {
               >
                 <Icon name={shiftActive ? 'stop' : 'play'} size={18} />
                 {shiftActive ? p.end_shift : p.start_shift}
-              </button>
+              </button>}
             </div>
           </div>
-        </PlatformCard>
+        </PlatformCard>}
 
-        <PlatformCard className="p-5 sm:p-6">
+        {featureEnabled('income') && <PlatformCard className="p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-[12px] font-bold uppercase tracking-[.1em] text-muted">{p.confirmed_hours}</div>
@@ -143,7 +145,7 @@ export default function PlatformHomePage() {
               {p.income} <span aria-hidden="true">→</span>
             </button>
           </div>
-        </PlatformCard>
+        </PlatformCard>}
       </div>
 
       <section className="mt-7" aria-labelledby="quick-actions-title">
@@ -164,7 +166,7 @@ export default function PlatformHomePage() {
       </section>
 
       <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,.75fr)]">
-        <section aria-labelledby="priority-title">
+        {featureEnabled('tasks') && <section aria-labelledby="priority-title">
           <SectionHeading
             title={p.priority}
             action={<PlatformButton variant="soft" onClick={() => navigate(PLATFORM_ROUTES.tasks)}>{p.see_all}</PlatformButton>}
@@ -187,9 +189,9 @@ export default function PlatformHomePage() {
               </button>
             ))}
           </PlatformCard>
-        </section>
+        </section>}
 
-        <section aria-labelledby="news-title">
+        {featureEnabled('news') && <section aria-labelledby="news-title">
           <SectionHeading title={p.news} />
           <PlatformCard className="h-[238px] overflow-hidden p-5">
             <div className="flex items-center justify-between gap-3">
@@ -202,7 +204,7 @@ export default function PlatformHomePage() {
               {p.see_all} <span aria-hidden="true">→</span>
             </button>
           </PlatformCard>
-        </section>
+        </section>}
       </div>
     </div>
   );

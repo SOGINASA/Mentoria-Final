@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import Spinner from '../components/ui/Spinner';
 import { useAuthStore } from '../store/authStore';
+import { usePlatformStore } from '../store/platformStore';
 import { HOME_ROUTE_BY_ROLE } from '../constants/roles';
 
 function FullScreenLoader() {
@@ -23,6 +24,16 @@ export function RequireAuth({ children }) {
 export function RequireRole({ roles, children }) {
   const role = useAuthStore((s) => s.user?.role);
   if (!roles.includes(role)) return <Navigate to={HOME_ROUTE_BY_ROLE[role] || '/'} replace />;
+  return children;
+}
+
+export function RequireFeature({ feature, children }) {
+  const hydrated = usePlatformStore((state) => state.hydrated);
+  const loading = usePlatformStore((state) => state.loading);
+  const enabled = usePlatformStore((state) => state.featureFlags?.staff_platform !== false
+    && state.featureFlags?.[feature] !== false);
+  if (!hydrated || loading) return <FullScreenLoader />;
+  if (!enabled) return <Navigate to="/app" replace />;
   return children;
 }
 

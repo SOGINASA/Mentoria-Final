@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Navigate, Routes, Route } from 'react-router-dom';
 import AppShell from '../components/layout/AppShell';
 import Spinner from '../components/ui/Spinner';
-import { RequireAuth, RequireRole, GuestOnly } from './guards';
+import { RequireAuth, RequireFeature, RequireRole, GuestOnly } from './guards';
 import { ROLE_SENDER, ROLE_REVIEWER, ROLE_HR, ROLE_FINANCE, ROLE_OPERATIONS, ROLE_ADMIN } from '../constants/roles';
 import { PLATFORM_ROUTES } from '../platform/platformConfig';
 
@@ -47,6 +47,7 @@ const hr = (el) => <RequireRole roles={[ROLE_HR, ROLE_ADMIN]}>{el}</RequireRole>
 const finance = (el) => <RequireRole roles={[ROLE_FINANCE, ROLE_ADMIN]}>{el}</RequireRole>;
 const operations = (el) => <RequireRole roles={[ROLE_OPERATIONS, ROLE_ADMIN]}>{el}</RequireRole>;
 const admin = (el) => <RequireRole roles={[ROLE_ADMIN]}>{el}</RequireRole>;
+const feature = (key, el) => <RequireFeature feature={key}>{el}</RequireFeature>;
 const platformPage = (el) => (
   <Suspense fallback={<div className="grid min-h-[50dvh] place-items-center"><Spinner size={30} /></div>}>
     {el}
@@ -75,9 +76,9 @@ export default function AppRouter() {
         }
       >
         <Route index element={platformPage(<PlatformHomePage />)} />
-        <Route path="shifts" element={platformPage(<PlatformShiftsPage />)} />
-        <Route path="income" element={platformPage(<PlatformIncomePage />)} />
-        <Route path="tasks" element={platformPage(<PlatformTasksPage />)} />
+        <Route path="shifts" element={feature('shifts', platformPage(<PlatformShiftsPage />))} />
+        <Route path="income" element={feature('income', platformPage(<PlatformIncomePage />))} />
+        <Route path="tasks" element={feature('tasks', platformPage(<PlatformTasksPage />))} />
         <Route path="approvals" element={platformPage(<PlatformApprovalsPage />)} />
         <Route path="management" element={platformPage(<PlatformManagerPage />)} />
         <Route path="control" element={reviewer(platformPage(<PlatformReviewerPage />))} />
@@ -89,13 +90,13 @@ export default function AppRouter() {
         <Route path="admin/writeoffs/:id" element={admin(<ReviewDetailPage basePath={PLATFORM_ROUTES.adminWriteoffs} />)} />
         <Route path="profile" element={platformPage(<PlatformProfilePage />)} />
         <Route path="notifications" element={platformPage(<PlatformNotificationsPage />)} />
-        <Route path="support" element={platformPage(<PlatformSupportPage />)} />
-        <Route path="news" element={platformPage(<PlatformNewsPage />)} />
-        <Route path="services" element={platformPage(<PlatformServicesPage />)} />
-        <Route path="learning" element={platformPage(<PlatformLearningPage />)} />
-        <Route path="learning/:courseId" element={platformPage(<PlatformCoursePage />)} />
-        <Route path="documents" element={platformPage(<PlatformDocumentsPage />)} />
-        <Route path="leave" element={platformPage(<PlatformLeavePage />)} />
+        <Route path="support" element={feature('support_cases', platformPage(<PlatformSupportPage />))} />
+        <Route path="news" element={feature('news', platformPage(<PlatformNewsPage />))} />
+        <Route path="services" element={feature('hr_services', platformPage(<PlatformServicesPage />))} />
+        <Route path="learning" element={feature('hr_services', platformPage(<PlatformLearningPage />))} />
+        <Route path="learning/:courseId" element={feature('hr_services', platformPage(<PlatformCoursePage />))} />
+        <Route path="documents" element={feature('hr_services', platformPage(<PlatformDocumentsPage />))} />
+        <Route path="leave" element={feature('hr_services', platformPage(<PlatformLeavePage />))} />
         <Route path="writeoff" element={sender(<CreateWriteOffPage exitPath={PLATFORM_ROUTES.home} successPath={PLATFORM_ROUTES.tasks} />)} />
         <Route path="*" element={platformPage(<PlatformComingSoonPage />)} />
       </Route>

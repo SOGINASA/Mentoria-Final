@@ -9,10 +9,16 @@ from constants import ROLE_MANAGER, ROLE_SENDER, STATUS_DRAFT
 from models import Employee, Store, User, WriteOff
 from platform_models import PlatformTask, Shift, SupportCase, Timecard
 from services.permissions import can_access_store, scoped_store_ids
-from utils.auth_helpers import get_current_user, permission_required
+from utils.auth_helpers import feature_required, get_current_user, permission_required
 from utils.platform_helpers import utcnow
 
 operations_bp = Blueprint('operations', __name__)
+
+
+@operations_bp.before_request
+@feature_required('staff_platform')
+def require_staff_platform():
+    pass
 
 
 def _utc_naive(value):

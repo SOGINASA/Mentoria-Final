@@ -5,11 +5,29 @@ from flask import Blueprint, request, jsonify
 
 from models import db, User, Store, Employee
 from platform_models import UserStoreScope
-from utils.auth_helpers import role_required
+from services.audit import audit
+from utils.auth_helpers import get_current_user, role_required
 from utils.validators import validate_username, validate_email
 from constants import ROLE_ADMIN, ROLE_MANAGER, ROLE_REVIEWER, ROLE_SENDER, ROLES
 
 admin_bp = Blueprint('admin', __name__)
+
+
+def _admin_removal_error(user, next_role, next_active):
+    """Prevent the current or last active administrator from losing access."""
+    if user.role != ROLE_ADMIN or not user.is_active:
+        return None
+    if next_role == ROLE_ADMIN and next_active:
+        return None
+    actor = get_current_user()
+    if actor and actor.id == user.id:
+        return 'Нельзя отключить собственный аккаунт администратора или изменить его роль'
+    other_admins = User.query.filter(
+        User.role == ROLE_ADMIN, User.is_active.is_(True), User.id != user.id,
+    ).count()
+    if not other_admins:
+        return 'Нельзя отключить или изменить роль последнего активного администратора'
+    return None
 
 
 # ============================ ПОЛЬЗОВАТЕЛИ ================================= #
@@ -36,6 +54,7 @@ def list_users():
 @admin_bp.route('/users', methods=['POST'])
 @role_required(ROLE_ADMIN)
 def create_user():
+    actor = get_current_user()
     data = request.get_json(silent=True) or {}
     username = (data.get('username') or '').strip()
     password = data.get('password') or ''
@@ -85,6 +104,9 @@ def create_user():
     user.set_password(password)
     _apply_supervised_stores(user, data)
     db.session.add(user)
+    db.session.flush()
+    audit(actor, 'admin.user_created', 'user', user.id, user.store_id,
+          {'username': user.username, 'role': user.role})
     db.session.commit()
     return jsonify({'user': user.to_dict()}), 201
 
@@ -108,6 +130,7 @@ def _apply_supervised_stores(user, data):
 @admin_bp.route('/users/<int:user_id>', methods=['PUT'])
 @role_required(ROLE_ADMIN)
 def update_user(user_id):
+    actor = get_current_user()
     user = User.query.get(user_id)
     if not user:
         return jsonify({'error': 'Пользователь не найден'}), 404
@@ -118,7 +141,22 @@ def update_user(user_id):
     if 'role' in data:
         if data['role'] not in ROLES:
             return jsonify({'error': 'Неверная роль'}), 400
+    next_role = data.get('role', user.role)
+    next_active = bool(data['is_active']) if 'is_active' in data else user.is_active
+    removal_error = _admin_removal_error(user, next_role, next_active)
+    if removal_error:
+        return jsonify({'error': removal_error}), 400
+    if 'role' in data:
         user.role = data['role']
+    if 'email' in data:
+        email = (data.get('email') or '').strip().lower() or None
+        if email and not validate_email(email):
+            return jsonify({'error': 'Неверный формат email'}), 400
+        duplicate = (User.query.filter(db.func.lower(User.email) == email, User.id != user.id).first()
+                     if email else None)
+        if duplicate:
+            return jsonify({'error': 'Email уже используется'}), 400
+        user.email = email
     if 'phone' in data:
         user.phone = (data['phone'] or '').strip() or None
     if 'store_id' in data:
@@ -145,6 +183,12 @@ def update_user(user_id):
 
     _apply_supervised_stores(user, data)
 
+    changed_fields = sorted(set(data) & {
+        'full_name', 'role', 'email', 'phone', 'store_id', 'employee_id',
+        'is_active', 'password', 'supervised_store_ids',
+    })
+    audit(actor, 'admin.user_updated', 'user', user.id, user.store_id,
+          {'fields': changed_fields})
     db.session.commit()
     return jsonify({'user': user.to_dict()})
 
@@ -152,11 +196,17 @@ def update_user(user_id):
 @admin_bp.route('/users/<int:user_id>', methods=['DELETE'])
 @role_required(ROLE_ADMIN)
 def delete_user(user_id):
+    actor = get_current_user()
     user = User.query.get(user_id)
     if not user:
         return jsonify({'error': 'Пользователь не найден'}), 404
+    removal_error = _admin_removal_error(user, user.role, False)
+    if removal_error:
+        return jsonify({'error': removal_error}), 400
     # Мягкое удаление — деактивация (чтобы не терять историю заявок)
     user.is_active = False
+    audit(actor, 'admin.user_deactivated', 'user', user.id, user.store_id,
+          {'username': user.username, 'role': user.role})
     db.session.commit()
     return jsonify({'message': 'Пользователь деактивирован'})
 
@@ -173,6 +223,7 @@ def list_stores_admin():
 @admin_bp.route('/stores', methods=['POST'])
 @role_required(ROLE_ADMIN)
 def create_store():
+    actor = get_current_user()
     data = request.get_json(silent=True) or {}
     name = (data.get('name') or '').strip()
     if not name:
@@ -183,6 +234,9 @@ def create_store():
         iiko_store_id=(data.get('iiko_store_id') or '').strip() or None,
     )
     db.session.add(store)
+    db.session.flush()
+    audit(actor, 'admin.store_created', 'store', store.id, store.id,
+          {'name': store.name})
     db.session.commit()
     return jsonify({'store': store.to_dict()}), 201
 
@@ -190,6 +244,7 @@ def create_store():
 @admin_bp.route('/stores/<int:store_id>', methods=['PUT'])
 @role_required(ROLE_ADMIN)
 def update_store(store_id):
+    actor = get_current_user()
     store = Store.query.get(store_id)
     if not store:
         return jsonify({'error': 'Точка не найдена'}), 404
@@ -202,6 +257,8 @@ def update_store(store_id):
         store.iiko_store_id = (data['iiko_store_id'] or '').strip() or None
     if 'is_active' in data:
         store.is_active = bool(data['is_active'])
+    audit(actor, 'admin.store_updated', 'store', store.id, store.id,
+          {'fields': sorted(set(data) & {'name', 'address', 'iiko_store_id', 'is_active'})})
     db.session.commit()
     return jsonify({'store': store.to_dict()})
 
@@ -209,10 +266,13 @@ def update_store(store_id):
 @admin_bp.route('/stores/<int:store_id>', methods=['DELETE'])
 @role_required(ROLE_ADMIN)
 def delete_store(store_id):
+    actor = get_current_user()
     store = Store.query.get(store_id)
     if not store:
         return jsonify({'error': 'Точка не найдена'}), 404
     store.is_active = False
+    audit(actor, 'admin.store_deactivated', 'store', store.id, store.id,
+          {'name': store.name})
     db.session.commit()
     return jsonify({'message': 'Точка деактивирована'})
 
@@ -233,6 +293,7 @@ def list_employees_admin():
 @admin_bp.route('/employees', methods=['POST'])
 @role_required(ROLE_ADMIN)
 def create_employee():
+    actor = get_current_user()
     data = request.get_json(silent=True) or {}
     full_name = (data.get('full_name') or '').strip()
     if not full_name:
@@ -247,6 +308,9 @@ def create_employee():
         iiko_employee_id=(data.get('iiko_employee_id') or '').strip() or None,
     )
     db.session.add(employee)
+    db.session.flush()
+    audit(actor, 'admin.employee_created', 'employee', employee.id, employee.store_id,
+          {'full_name': employee.full_name})
     db.session.commit()
     return jsonify({'employee': employee.to_dict()}), 201
 
@@ -254,6 +318,7 @@ def create_employee():
 @admin_bp.route('/employees/<int:employee_id>', methods=['PUT'])
 @role_required(ROLE_ADMIN)
 def update_employee(employee_id):
+    actor = get_current_user()
     employee = Employee.query.get(employee_id)
     if not employee:
         return jsonify({'error': 'Сотрудник не найден'}), 404
@@ -270,6 +335,10 @@ def update_employee(employee_id):
         employee.iiko_employee_id = (data['iiko_employee_id'] or '').strip() or None
     if 'is_active' in data:
         employee.is_active = bool(data['is_active'])
+    audit(actor, 'admin.employee_updated', 'employee', employee.id, employee.store_id,
+          {'fields': sorted(set(data) & {
+              'full_name', 'position', 'store_id', 'iiko_employee_id', 'is_active',
+          })})
     db.session.commit()
     return jsonify({'employee': employee.to_dict()})
 
@@ -277,9 +346,12 @@ def update_employee(employee_id):
 @admin_bp.route('/employees/<int:employee_id>', methods=['DELETE'])
 @role_required(ROLE_ADMIN)
 def delete_employee(employee_id):
+    actor = get_current_user()
     employee = Employee.query.get(employee_id)
     if not employee:
         return jsonify({'error': 'Сотрудник не найден'}), 404
     employee.is_active = False
+    audit(actor, 'admin.employee_deactivated', 'employee', employee.id, employee.store_id,
+          {'full_name': employee.full_name})
     db.session.commit()
     return jsonify({'message': 'Сотрудник деактивирован'})

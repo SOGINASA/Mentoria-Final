@@ -93,7 +93,18 @@ export function canUseSystemAdmin(permissions = []) {
   return permissions.includes('*');
 }
 
-export function createPlatformNavigation(copy, pendingTaskCount = 0, permissions = []) {
+const ROUTE_FEATURES = {
+  [PLATFORM_ROUTES.shifts]: 'shifts',
+  [PLATFORM_ROUTES.income]: 'income',
+  [PLATFORM_ROUTES.tasks]: 'tasks',
+  [PLATFORM_ROUTES.services]: 'hr_services',
+};
+
+function featureIsEnabled(featureFlags, key) {
+  return featureFlags?.staff_platform !== false && featureFlags?.[key] !== false;
+}
+
+export function createPlatformNavigation(copy, pendingTaskCount = 0, permissions = [], featureFlags = {}) {
   if (canUseSystemAdmin(permissions)) {
     return [
       { to: PLATFORM_ROUTES.admin, end: true, icon: 'sliders', label: copy.admin_workspace },
@@ -123,7 +134,8 @@ export function createPlatformNavigation(copy, pendingTaskCount = 0, permissions
       label: copy.services,
       activeRoutes: EMPLOYEE_SERVICE_ROUTES,
     },
-  ];
+  ].filter((item) => !ROUTE_FEATURES[item.to]
+    || featureIsEnabled(featureFlags, ROUTE_FEATURES[item.to]));
   if (canUseOperationsWorkspace(permissions)) {
     return navigation.filter((item) => [PLATFORM_ROUTES.home, PLATFORM_ROUTES.operations,
       PLATFORM_ROUTES.management, PLATFORM_ROUTES.approvals, PLATFORM_ROUTES.services].includes(item.to));
@@ -144,8 +156,8 @@ export function createPlatformNavigation(copy, pendingTaskCount = 0, permissions
   return navigation;
 }
 
-export function createPlatformMobileNavigation(copy, pendingTaskCount = 0, permissions = []) {
-  const navigation = createPlatformNavigation(copy, pendingTaskCount, permissions);
+export function createPlatformMobileNavigation(copy, pendingTaskCount = 0, permissions = [], featureFlags = {}) {
+  const navigation = createPlatformNavigation(copy, pendingTaskCount, permissions, featureFlags);
   if (canUseOperationsWorkspace(permissions)) return navigation;
   if (canUseReviewerControl(permissions)) {
     return navigation.filter((item) => [
@@ -165,14 +177,16 @@ export function createPlatformMobileNavigation(copy, pendingTaskCount = 0, permi
     : navigation;
 }
 
-export function createEmployeeServiceNavigation(copy) {
+export function createEmployeeServiceNavigation(copy, featureFlags = {}) {
   return [
     { to: PLATFORM_ROUTES.services, end: true, icon: 'grid', label: copy.service_overview },
     { to: PLATFORM_ROUTES.learning, icon: 'book', label: copy.learning_center },
     { to: PLATFORM_ROUTES.documents, icon: 'fileText', label: copy.documents },
     { to: PLATFORM_ROUTES.leave, icon: 'calendar', label: copy.vacation },
     { to: PLATFORM_ROUTES.support, icon: 'helpCircle', label: copy.support },
-  ];
+  ].filter((item) => item.to === PLATFORM_ROUTES.support
+    ? featureIsEnabled(featureFlags, 'support_cases')
+    : featureIsEnabled(featureFlags, 'hr_services'));
 }
 
 export function isPlatformNavigationItemActive(item, pathname, routerIsActive = false) {

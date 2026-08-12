@@ -36,3 +36,11 @@ def flags_for_user(user):
                 value = matches[-1].enabled
         flags[flag.key] = value
     return flags
+
+
+def feature_enabled_for_user(user, key):
+    """Return the effective value for a feature, including platform shutdown."""
+    flags = flags_for_user(user)
+    if key != 'staff_platform' and not flags.get('staff_platform', False):
+        return False
+    return bool(flags.get(key, False))

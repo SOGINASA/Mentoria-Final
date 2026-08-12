@@ -34,16 +34,22 @@ function usePlatformNav() {
     state.tasks.filter((task) => !task.done).length
   ));
   const permissions = usePlatformStore((state) => state.permissions);
+  const featureFlags = usePlatformStore((state) => state.featureFlags);
   const role = useAuthStore((state) => state.user?.role);
-  return createPlatformNavigation(p, pendingTaskCount, role === ROLE_ADMIN ? ['*'] : permissions);
+  return createPlatformNavigation(
+    p, pendingTaskCount, role === ROLE_ADMIN ? ['*'] : permissions, featureFlags,
+  );
 }
 
 function usePlatformMobileNav() {
   const { p } = usePlatformCopy();
   const pendingTaskCount = usePlatformStore((state) => state.tasks.filter((task) => !task.done).length);
   const permissions = usePlatformStore((state) => state.permissions);
+  const featureFlags = usePlatformStore((state) => state.featureFlags);
   const role = useAuthStore((state) => state.user?.role);
-  return createPlatformMobileNavigation(p, pendingTaskCount, role === ROLE_ADMIN ? ['*'] : permissions);
+  return createPlatformMobileNavigation(
+    p, pendingTaskCount, role === ROLE_ADMIN ? ['*'] : permissions, featureFlags,
+  );
 }
 
 function PlatformSidebar() {
@@ -173,9 +179,11 @@ function PlatformSectionNav() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { p } = usePlatformCopy();
+  const featureFlags = usePlatformStore((state) => state.featureFlags);
   if (!isEmployeeServiceRoute(pathname)) return null;
 
-  const items = createEmployeeServiceNavigation(p);
+  const items = createEmployeeServiceNavigation(p, featureFlags);
+  if (!items.length) return null;
   const currentItem = items.find((item) => (
     pathname === item.to || (!item.end && pathname.startsWith(`${item.to}/`))
   )) || items[0];
@@ -250,6 +258,9 @@ export default function PlatformShell() {
   const stopPolling = useNotifyStore((s) => s.stopPolling);
   const hydrate = usePlatformStore((s) => s.hydrate);
   const userId = useAuthStore((s) => s.user?.id);
+  const role = useAuthStore((s) => s.user?.role);
+  const hydrated = usePlatformStore((state) => state.hydrated);
+  const platformEnabled = usePlatformStore((state) => state.featureFlags.staff_platform !== false);
   const [mutationQueue, setMutationQueue] = useState({ pending: 0, failed: 0 });
 
   useEffect(() => {
@@ -276,6 +287,18 @@ export default function PlatformShell() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     mainRef.current?.focus({ preventScroll: true });
   }, [pathname]);
+
+  if (hydrated && role !== ROLE_ADMIN && !platformEnabled) {
+    return (
+      <main className="grid min-h-[100dvh] place-items-center bg-bg px-5 text-center">
+        <div className="max-w-md rounded-3xl border border-line bg-surface p-8 shadow-card">
+          <Icon name="lock" size={32} className="mx-auto text-orange" />
+          <h1 className="mt-4 font-head text-2xl font-semibold text-text">Платформа временно недоступна</h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted">Доступ отключён администратором. Обновите страницу позже или обратитесь к руководителю.</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div className="flex min-h-[100dvh] bg-bg text-text">

@@ -11,10 +11,16 @@ from platform_models import (
 )
 from services.employee_services import LEARNING_CATALOG
 from services.permissions import can_access_store, scoped_store_ids
-from utils.auth_helpers import get_current_user, permission_required
+from utils.auth_helpers import feature_required, get_current_user, permission_required
 from utils.platform_helpers import utcnow
 
 hr_bp = Blueprint('hr', __name__)
+
+
+@hr_bp.before_request
+@feature_required('staff_platform')
+def require_staff_platform():
+    pass
 
 REQUIRED_COURSE_IDS = ('service-standards', 'kitchen-safety')
 

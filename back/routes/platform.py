@@ -11,18 +11,18 @@ from services.audit import audit
 from services.feature_flags import flags_for_user
 from services.employee_services import employee_services_payload
 from services.permissions import permissions_for_user, scope_payload
-from utils.auth_helpers import get_current_user
+from utils.auth_helpers import feature_required, get_current_user
 from utils.platform_helpers import utcnow
 
 platform_bp = Blueprint('platform', __name__)
 
 
-def user_context(user):
+def user_context(user, feature_flags=None):
     return {
         'user': user.to_dict(),
         'permissions': permissions_for_user(user),
         'scopes': scope_payload(user),
-        'feature_flags': flags_for_user(user),
+        'feature_flags': feature_flags if feature_flags is not None else flags_for_user(user),
     }
 
 
@@ -31,20 +31,29 @@ def user_context(user):
 def bootstrap():
     user = get_current_user()
     now = utcnow()
-    assignments = (ShiftAssignment.query.join(Shift)
-                   .filter(ShiftAssignment.user_id == user.id,
-                           ShiftAssignment.status == 'confirmed',
-                           Shift.status == 'published',
-                           Shift.ends_at >= now - timedelta(hours=12),
-                           Shift.starts_at <= now + timedelta(days=14))
-                   .order_by(Shift.starts_at).all())
-    tasks = (PlatformTask.query.filter(
-        PlatformTask.status.in_(('active', 'in_progress')),
-        db.or_(PlatformTask.assignee_id == user.id,
-               db.and_(PlatformTask.assignee_id.is_(None), PlatformTask.store_id == user.store_id)),
-    ).order_by(PlatformTask.due_at.asc()).limit(20).all())
-    last_event = TimeEvent.query.filter_by(user_id=user.id).order_by(TimeEvent.occurred_at.desc()).first()
-    payload = user_context(user)
+    feature_flags = flags_for_user(user)
+    platform_enabled = feature_flags.get('staff_platform', False)
+    assignments = []
+    if platform_enabled and feature_flags.get('shifts', False):
+        assignments = (ShiftAssignment.query.join(Shift)
+                       .filter(ShiftAssignment.user_id == user.id,
+                               ShiftAssignment.status == 'confirmed',
+                               Shift.status == 'published',
+                               Shift.ends_at >= now - timedelta(hours=12),
+                               Shift.starts_at <= now + timedelta(days=14))
+                       .order_by(Shift.starts_at).all())
+    tasks = []
+    if platform_enabled and feature_flags.get('tasks', False):
+        tasks = (PlatformTask.query.filter(
+            PlatformTask.status.in_(('active', 'in_progress')),
+            db.or_(PlatformTask.assignee_id == user.id,
+                   db.and_(PlatformTask.assignee_id.is_(None), PlatformTask.store_id == user.store_id)),
+        ).order_by(PlatformTask.due_at.asc()).limit(20).all())
+    last_event = None
+    if platform_enabled and feature_flags.get('time_tracking', False):
+        last_event = TimeEvent.query.filter_by(user_id=user.id).order_by(
+            TimeEvent.occurred_at.desc()).first()
+    payload = user_context(user, feature_flags)
     payload.update({
         'server_time': now.isoformat().replace('+00:00', 'Z'),
         'shifts': [assignment.shift.to_dict() for assignment in assignments],
@@ -54,13 +63,15 @@ def bootstrap():
             'last_event': last_event.to_dict() if last_event else None,
         },
         'unread_notifications': Notification.query.filter_by(user_id=user.id, is_read=False).count(),
-        'employee_services': employee_services_payload(user),
+        'employee_services': (employee_services_payload(user)
+                              if platform_enabled and feature_flags.get('hr_services', False)
+                              else {}),
     })
     return jsonify(payload)
 
 
 @platform_bp.patch('/profile')
-@jwt_required()
+@feature_required('staff_platform')
 def update_profile():
     user = get_current_user()
     data = request.get_json(silent=True) or {}

@@ -174,6 +174,11 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to`
 - `PATCH /api/platform/profile` — изменение только `full_name`, `email`, `phone`.
 - `GET /api/auth/me` — пользователь вместе с permissions/scopes/feature flags.
 
+Выключенный feature flag исключает данные модуля из bootstrap. Запросы к API
+модулей `shifts`, `time_tracking`, `tasks`, `support_cases`, `news` и
+`hr_services` возвращают `403` с полем `feature`; отключение `staff_platform`
+блокирует все эти модули сразу.
+
 ## Смены
 
 - `GET /api/shifts?from=&to=` — назначенные опубликованные смены.
@@ -292,6 +297,10 @@ HR-системы. `ANNUAL_LEAVE_ALLOWANCE_DAYS` и `ANNUAL_LEAVE_USED_DAYS` —
 - `PUT /api/admin/platform/users/{id}/scopes` — store scopes.
 - `GET|PUT /api/admin/platform/feature-flags[/<key>]` — feature flags и targets.
 - `GET /api/admin/platform/audit` — append-only audit feed.
+
+Создание, изменение и деактивация пользователей, точек и сотрудников также
+записываются в audit feed. Текущий и последний активный аккаунт администратора
+нельзя деактивировать или перевести в другую роль.
 
 Изменяющие state machine endpoints принимают поле `version`; при устаревшей
 версии возвращается `409 Conflict`.
