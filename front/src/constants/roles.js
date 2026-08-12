@@ -13,7 +13,7 @@ export const HOME_ROUTE_BY_ROLE = {
   [ROLE_REVIEWER]: '/app/control',
   [ROLE_MANAGER]: '/app',
   [ROLE_HR]: '/app/hr',
-  [ROLE_FINANCE]: '/app',
+  [ROLE_FINANCE]: '/app/finance',
   [ROLE_OPERATIONS]: '/app',
   [ROLE_ADMIN]: '/admin',
 };

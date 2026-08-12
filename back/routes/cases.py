@@ -3,6 +3,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 
+from constants import ROLE_FINANCE, ROLE_HR
 from models import db
 from platform_models import CaseMessage, SupportCase
 from services.audit import audit
@@ -14,9 +15,18 @@ from utils.platform_helpers import utcnow
 cases_bp = Blueprint('cases', __name__)
 
 
+def _can_manage(user, case):
+    if not has_permission(user, 'cases.manage') or not can_access_store(user, case.store_id):
+        return False
+    if user.role == ROLE_HR:
+        return case.category == 'hr'
+    if user.role == ROLE_FINANCE:
+        return case.category == 'payroll'
+    return True
+
+
 def _can_view(user, case):
-    return case.author_id == user.id or (has_permission(user, 'cases.manage') and
-                                         can_access_store(user, case.store_id))
+    return case.author_id == user.id or _can_manage(user, case)
 
 
 @cases_bp.get('')
@@ -81,7 +91,7 @@ def add_message(case_id):
 def update_case(case_id):
     user = get_current_user()
     item = SupportCase.query.get_or_404(case_id)
-    if not has_permission(user, 'cases.manage') or not can_access_store(user, item.store_id):
+    if not _can_manage(user, item):
         return jsonify({'error': 'Недостаточно прав'}), 403
     data = request.get_json(silent=True) or {}
     if data.get('status') not in ('open', 'in_progress', 'resolved', 'closed'):
