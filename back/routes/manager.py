@@ -153,8 +153,10 @@ def today():
                    'timecards': len(timecards), 'tasks': len(tasks),
                    'document_requests': len(document_requests),
                    'leave_requests': len(leave_requests)},
-        'shift_requests': [item.to_dict() for item in shift_requests],
-        'time_corrections': [item.to_dict() for item in corrections],
+        'shift_requests': [{**item.to_dict(), 'store_id': item.shift.store_id}
+                           for item in shift_requests],
+        'time_corrections': [{**item.to_dict(), 'store_id': item.timecard.store_id}
+                             for item in corrections],
         'timecards': [item.to_dict() for item in timecards],
         'tasks': [item.to_dict() for item in tasks],
         'document_requests': [item.to_dict() for item in document_requests],

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as casesApi from '../../api/cases.api';
 import Icon from '../../components/ui/Icon';
@@ -13,6 +13,7 @@ import PlatformModal from '../components/PlatformModal';
 import { IconTile, PageIntro, PlatformButton, PlatformCard, PlatformField, StatusPill } from '../components/PlatformUi';
 
 export default function PlatformSupportPage() {
+  const storeFilter = new URLSearchParams(window.location.search).get('store_id');
   const navigate = useNavigate();
   const { p } = usePlatformCopy();
   const showToast = useUiStore((s) => s.showToast);
@@ -31,6 +32,9 @@ export default function PlatformSupportPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [sentTicket, setSentTicket] = useState(null);
+  const visibleTickets = useMemo(() => (
+    storeFilter ? tickets.filter((ticket) => String(ticket.store_id) === storeFilter) : tickets
+  ), [storeFilter, tickets]);
 
   useEffect(() => {
     if (!canManage || mode !== 'inbox') return;
@@ -112,7 +116,7 @@ export default function PlatformSupportPage() {
     <div className="mx-auto w-full max-w-[1080px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
       <PageIntro eyebrow={p.support} title={canManage && mode === 'inbox' ? 'Обращения команды' : 'Помощь и обращения'} subtitle={canManage && mode === 'inbox' ? 'Отвечайте сотрудникам и контролируйте решение вопросов' : 'Выберите тему — вопрос сразу попадёт нужной команде'} />
       {canManage && <div className="mt-5 inline-grid grid-cols-2 gap-1 rounded-2xl border border-line bg-surface p-1"><button type="button" onClick={() => setMode('inbox')} className={`min-h-11 rounded-xl px-4 text-[12px] font-bold ${mode === 'inbox' ? 'bg-brand text-on-brand' : 'text-muted'}`}>Входящие</button><button type="button" onClick={() => setMode('create')} className={`min-h-11 rounded-xl px-4 text-[12px] font-bold ${mode === 'create' ? 'bg-brand text-on-brand' : 'text-muted'}`}>Моё обращение</button></div>}
-      {canManage && mode === 'inbox' ? <ManagerCases tickets={tickets} loading={loading} onOpen={openTicket} /> :
+      {canManage && mode === 'inbox' ? <ManagerCases tickets={visibleTickets} loading={loading} onOpen={openTicket} /> :
       <form onSubmit={submit} className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <PlatformCard className="p-5 sm:p-6">
           <fieldset>

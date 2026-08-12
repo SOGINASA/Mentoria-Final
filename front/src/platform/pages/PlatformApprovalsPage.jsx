@@ -111,12 +111,17 @@ async function submitDecision(type, item, action, reason, fileUrl, ownerId) {
 }
 
 export default function PlatformApprovalsPage() {
+  const initialQuery = new URLSearchParams(window.location.search);
+  const requestedType = initialQuery.get('type');
+  const storeFilter = initialQuery.get('store_id');
   const userId = useAuthStore((state) => state.user?.id);
   const hydrated = usePlatformStore((state) => state.hydrated);
   const permissions = usePlatformStore((state) => state.permissions);
   const showToast = useUiStore((state) => state.showToast);
   const [queue, setQueue] = useState(EMPTY_QUEUE);
-  const [activeType, setActiveType] = useState('all');
+  const [activeType, setActiveType] = useState(
+    requestedType && QUEUE_TYPES[requestedType] ? requestedType : 'all',
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [decision, setDecision] = useState(null);
@@ -147,7 +152,13 @@ export default function PlatformApprovalsPage() {
     return () => window.removeEventListener(FLUSH_EVENT, reload);
   }, [reload]);
 
-  const groups = useMemo(() => Object.entries(queue).filter(([, items]) => items.length), [queue]);
+  const filteredQueue = useMemo(() => Object.fromEntries(
+    Object.entries(queue).map(([type, items]) => [
+      type,
+      storeFilter ? items.filter((item) => String(item.store_id) === storeFilter) : items,
+    ]),
+  ), [queue, storeFilter]);
+  const groups = useMemo(() => Object.entries(filteredQueue).filter(([, items]) => items.length), [filteredQueue]);
   const total = groups.reduce((sum, [, items]) => sum + items.length, 0);
   const visibleGroups = activeType === 'all' ? groups : groups.filter(([type]) => type === activeType);
 
@@ -225,7 +236,7 @@ export default function PlatformApprovalsPage() {
                 aria-pressed={activeType === type}
                 className={`min-h-[92px] rounded-[20px] border p-3 text-left shadow-card-sm transition-[background-color,border-color,transform] active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green ${activeType === type ? 'border-green bg-green-tint' : 'border-line bg-surface hover:border-green'}`}
               >
-                <div className="flex items-center justify-between gap-2"><Icon name={config.icon} size={19} className={activeType === type ? 'text-green' : 'text-muted'} /><span className="font-head text-[23px] font-semibold tabular-nums text-text">{queue[type].length}</span></div>
+                <div className="flex items-center justify-between gap-2"><Icon name={config.icon} size={19} className={activeType === type ? 'text-green' : 'text-muted'} /><span className="font-head text-[23px] font-semibold tabular-nums text-text">{filteredQueue[type].length}</span></div>
                 <div className="mt-3 truncate text-[11px] font-bold text-muted">{config.label}</div>
               </button>
             ))}
