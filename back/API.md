@@ -69,7 +69,8 @@
 ### GET `/api/write-offs`
 Список с фильтрами. Sender видит только свои; reviewer/admin — все.
 
-Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` (ГГГГ-ММ-ДД), `scope=mine`, `page`, `per_page`.
+Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to`
+(ГГГГ-ММ-ДД), `scope=mine`, `sort=newest|oldest`, `page`, `per_page`.
 ```json
 { "write_offs": [ { ... } ],
   "pagination": { "page": 1, "per_page": 20, "total": 42, "pages": 3 } }
@@ -99,7 +100,10 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 ```
 
 ### GET `/api/write-offs/analytics`  (роль: reviewer/admin)
-Сводная аналитика для дэшборда. Считается на сервере по **всем** заявкам (не ограничена пагинацией списка). Черновики (`draft`) исключены. Query: `days` (окно тренда, 1..90, по умолч. 7), `store_id` (опц. фильтр по точке).
+Сводная аналитика для дэшборда. Считается на сервере по всем заявкам за
+выбранный период (не ограничена пагинацией списка). Черновики (`draft`)
+исключены. Query: `days` (период всех показателей, 1..90, по умолч. 7),
+`store_id` (опц. фильтр по точке).
 Деньги — **оценка**: `count × ANALYTICS_AVG_LOSS` (реальной цены в данных нет; `ANALYTICS_AVG_LOSS` задаётся через env, по умолч. 1500 ₸).
 ```json
 {
@@ -181,7 +185,9 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 - `POST /api/shifts/manager/{id}/assignments`,
   `POST /api/shifts/manager/{id}/publish` — назначение и публикация.
 - `GET /api/shifts/manager/requests`,
-  `POST /api/shifts/manager/requests/{id}/decision` — очередь решений.
+  `POST /api/shifts/manager/requests/{id}/decision` — очередь решений; требуется
+  permission `shift_requests.review`, доступная менеджеру, проверяющему и
+  операционному руководителю без выдачи полного `shifts.manage` проверяющему.
 
 ## Учёт времени
 
@@ -202,6 +208,9 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 - `/api/tasks/manager...` — шаблоны, назначение и проверка менеджером.
 - `GET|POST /api/cases`, `POST /api/cases/{id}/messages` — обращения.
 - `GET /api/news`, `POST /api/news/{id}/read` — новости и отметка прочтения.
+- `GET /api/news/manage-context` — доступные автору новости торговые точки;
+  требует `news.manage`. Опубликованные записи всегда остаются видимыми автору,
+  даже если он сам не входит в выбранную аудиторию.
 - `GET /api/manager/today` — единая очередь смен, табелей, корректировок, задач,
   запросов документов и заявок на отсутствие. Все элементы фильтруются по
   store scopes менеджера; новые типы добавлены в ответ отдельными массивами и
@@ -235,6 +244,15 @@ Query: `status` (pending|approved|rejected), `store_id`, `date_from`, `date_to` 
 - `/api/employee-services/manager/documents/requests...` и
   `/api/employee-services/manager/leave/requests...` — scoped-очереди и решения
   менеджера/HR с optimistic `version`, audit и уведомлением сотрудника.
+  Собственные заявки управляющего пользователя исключаются из очередей и не
+  могут быть им согласованы.
+
+## HR-кабинет
+
+- `GET /api/hr/workspace?store_id=` — scoped-сводка команды, кадровых запросов,
+  отсутствий и обучения. Список команды объединяет активный справочник
+  `Employee` со связанными аккаунтами `User`; сотрудник без аккаунта сохраняется
+  в выдаче с `has_account=false`, а связанная пара возвращается одной записью.
 
 При согласовании ежегодного отпуска backend повторно проверяет актуальный
 предварительный баланс. Если ранее была одобрена другая заявка и лимита уже не

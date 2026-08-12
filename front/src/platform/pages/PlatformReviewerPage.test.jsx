@@ -13,6 +13,7 @@ describe('reviewer workspace', () => {
     managerApi.getTodayQueue.mockResolvedValue({ tasks: [{ id: 4 }], timecards: [] });
     writeOffsApi.listWriteOffs.mockResolvedValue({
       write_offs: [{ id: 8, store_id: 1, status: 'pending', created_at: '2026-08-12T08:00:00Z', comment: 'Повреждённая упаковка', photos: [], author: { full_name: 'Алия' }, store: { name: 'Bahandi Абая' } }],
+      pagination: { page: 1, per_page: 20, total: 21, pages: 2 },
     });
     writeOffsApi.getAnalytics.mockResolvedValue({ totals: { total: 3, pending: 1, approved: 2, rejected: 0 }, with_hold: 1, no_hold: 2, trend: [], by_store: [] });
   });
@@ -24,6 +25,16 @@ describe('reviewer workspace', () => {
 
     expect(await screen.findByRole('heading', { name: 'Контроль точек' })).toBeInTheDocument();
     expect(await screen.findByText('Повреждённая упаковка')).toBeInTheDocument();
+    expect(screen.getByText('Показаны 1–20 из 21')).toBeInTheDocument();
+    expect(writeOffsApi.listWriteOffs).toHaveBeenCalledWith({
+      status: 'pending', sort: 'oldest', page: 1, per_page: 20,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
+    await waitFor(() => expect(writeOffsApi.listWriteOffs).toHaveBeenCalledWith({
+      status: 'pending', sort: 'oldest', page: 2, per_page: 20,
+    }));
+
     fireEvent.click(screen.getByRole('tab', { name: 'Аналитика' }));
     expect(screen.getByRole('heading', { name: 'Качество списаний' })).toBeInTheDocument();
     await waitFor(() => expect(writeOffsApi.getAnalytics).toHaveBeenCalledWith({ days: '30' }));

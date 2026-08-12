@@ -3,12 +3,12 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 
-from models import db
+from models import Store, db
 from platform_models import NewsPost, NewsRead
 from services.audit import audit
 from services.idempotency import idempotent_mutation
 from services.permissions import can_access_store, has_permission, scoped_store_ids
-from utils.auth_helpers import get_current_user
+from utils.auth_helpers import get_current_user, permission_required
 from utils.platform_helpers import parse_datetime, utcnow
 
 news_bp = Blueprint('news', __name__)
@@ -20,11 +20,27 @@ news_bp = Blueprint('news', __name__)
 def list_news():
     user = get_current_user()
     query = NewsPost.query.filter_by(status='published').filter(
-        db.or_(NewsPost.audience_role.is_(None), NewsPost.audience_role == user.role),
-        db.or_(NewsPost.store_id.is_(None), NewsPost.store_id == user.store_id),
+        db.or_(
+            NewsPost.created_by_id == user.id,
+            db.and_(
+                db.or_(NewsPost.audience_role.is_(None), NewsPost.audience_role == user.role),
+                db.or_(NewsPost.store_id.is_(None), NewsPost.store_id == user.store_id),
+            ),
+        ),
     ).order_by(NewsPost.published_at.desc())
     reads = {row.post_id for row in NewsRead.query.filter_by(user_id=user.id).all()}
     return jsonify({'news': [post.to_dict(post.id in reads) for post in query.all()]})
+
+
+@news_bp.get('/manage-context')
+@permission_required('news.manage')
+def manage_context():
+    user = get_current_user()
+    allowed_store_ids = scoped_store_ids(user)
+    query = Store.query.filter_by(is_active=True).order_by(Store.name)
+    if allowed_store_ids is not None:
+        query = query.filter(Store.id.in_(list(allowed_store_ids)))
+    return jsonify({'stores': [store.to_dict() for store in query.all()]})
 
 
 @news_bp.post('/<int:post_id>/read')

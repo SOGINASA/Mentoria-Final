@@ -135,6 +135,30 @@ def test_open_shift_request_and_manager_decision(client, store, sender, manager,
     assert response.get_json()['request']['status'] == 'approved'
 
 
+def test_reviewer_can_decide_shift_request_without_managing_shifts(
+        client, store, sender, manager, reviewer, auth):
+    shift = create_published_shift(client, auth, manager, store, headcount=2)
+    created = client.post(f"/api/shifts/{shift['id']}/requests", headers=auth(sender),
+                          json={'request_type': 'open_shift'})
+    item = created.get_json()['request']
+
+    queue = client.get('/api/manager/today', headers=auth(reviewer))
+    assert queue.status_code == 200
+    assert [request['id'] for request in queue.get_json()['shift_requests']] == [item['id']]
+
+    decision = client.post(
+        f"/api/shifts/manager/requests/{item['id']}/decision",
+        headers=auth(reviewer), json={'decision': 'approved', 'version': 1},
+    )
+    assert decision.status_code == 200
+    assert decision.get_json()['request']['status'] == 'approved'
+
+    forbidden = client.post('/api/shifts/manager', headers=auth(reviewer), json={
+        'store_id': store.id, 'starts_at': iso(12), 'ends_at': iso(18),
+    })
+    assert forbidden.status_code == 403
+
+
 def test_time_state_machine_idempotency_and_approval(client, store, sender, manager, auth):
     shift = create_published_shift(client, auth, manager, store, sender, start=-1, end=8)
     base = datetime.now(timezone.utc) - timedelta(minutes=30)

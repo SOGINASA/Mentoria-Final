@@ -337,7 +337,8 @@ def confirm_draft(wo_id):
 @jwt_required()
 def list_write_offs():
     """Список заявок с фильтрами.
-    Query: status, store_id, date_from, date_to, scope (mine|all), page, per_page.
+    Query: status, store_id, date_from, date_to, scope (mine|all), sort
+    (newest|oldest), page, per_page.
     Отправитель всегда видит только свои; проверяющий/админ — все (или ?scope=mine)."""
     user = get_current_user()
     query = WriteOff.query
@@ -379,7 +380,13 @@ def list_write_offs():
     if date_to:
         query = query.filter(func.date(WriteOff.created_at) <= date_to)
 
-    query = query.order_by(WriteOff.created_at.desc())
+    sort = request.args.get('sort', 'newest')
+    if sort not in ('newest', 'oldest'):
+        return jsonify({'error': 'sort должен быть newest или oldest'}), 400
+    if sort == 'oldest':
+        query = query.order_by(WriteOff.created_at.asc(), WriteOff.id.asc())
+    else:
+        query = query.order_by(WriteOff.created_at.desc(), WriteOff.id.desc())
 
     page, per_page = get_pagination(request)
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -553,7 +560,7 @@ def analytics():
     исключены: это ещё не подтверждённые авто-падения.
 
     Query:
-        days     — окно тренда в днях (1..90, по умолчанию 7)
+        days     — период всех показателей в днях (1..90, по умолчанию 7)
         store_id — ограничить аналитику одной точкой (опц.)
 
     Деньги — ОЦЕНКА: count × ANALYTICS_AVG_LOSS (реальной цены в данных нет).
@@ -561,6 +568,7 @@ def analytics():
     user = get_current_user()
     days = request.args.get('days', default=7, type=int) or 7
     days = max(1, min(days, 90))
+    start = datetime.now(timezone.utc).date() - timedelta(days=days - 1)
     store_id = request.args.get('store_id', type=int)
     avg_loss = int(current_app.config.get('ANALYTICS_AVG_LOSS', 1500))
 
@@ -571,6 +579,7 @@ def analytics():
         """Общие фильтры аналитики: без черновиков + опц. по точке +
         ограничение супервайзера его точками."""
         query = query.filter(WriteOff.status != STATUS_DRAFT)
+        query = query.filter(func.date(WriteOff.created_at) >= start.isoformat())
         if sup_ids is not None:
             query = query.filter(WriteOff.store_id.in_(sup_ids))
         if store_id:
@@ -624,10 +633,8 @@ def analytics():
     ]
 
     # --- Динамика по дням (последние `days` суток, UTC) ---
-    start = datetime.now(timezone.utc).date() - timedelta(days=days - 1)
     trend_rows = (
         scoped(db.session.query(func.date(WriteOff.created_at), func.count(WriteOff.id)))
-        .filter(func.date(WriteOff.created_at) >= start.isoformat())
         .group_by(func.date(WriteOff.created_at)).all()
     )
     # func.date() в SQLite даёт строку, в Postgres — date; нормализуем ключ.

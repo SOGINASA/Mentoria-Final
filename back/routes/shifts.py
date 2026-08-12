@@ -272,22 +272,23 @@ def publish_shift(shift_id):
 
 
 @shifts_bp.get('/manager/requests')
-@permission_required('shifts.manage')
+@permission_required('shift_requests.review')
 def manager_requests():
     user = get_current_user()
     items = ShiftRequest.query.filter_by(status=request.args.get('status', 'pending')).order_by(
         ShiftRequest.created_at).all()
-    items = [item for item in items if can_access_store(user, item.shift.store_id, 'shifts.manage')]
+    items = [item for item in items
+             if can_access_store(user, item.shift.store_id, 'shift_requests.review')]
     return jsonify({'requests': [item.to_dict() for item in items]})
 
 
 @shifts_bp.post('/manager/requests/<int:request_id>/decision')
-@permission_required('shifts.manage')
+@permission_required('shift_requests.review')
 @idempotent_mutation
 def decide_request(request_id):
     manager = get_current_user()
     item = ShiftRequest.query.get_or_404(request_id)
-    if not can_access_store(manager, item.shift.store_id, 'shifts.manage'):
+    if not can_access_store(manager, item.shift.store_id, 'shift_requests.review'):
         return jsonify({'error': 'Нет доступа к точке'}), 403
     data = request.get_json(silent=True) or {}
     decision = data.get('decision')

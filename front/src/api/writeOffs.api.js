@@ -5,7 +5,7 @@ function qs(params = {}) {
   return entries.length ? `?${new URLSearchParams(entries).toString()}` : '';
 }
 
-// Список заявок с фильтрами: { status, store_id, date_from, date_to, scope, page, per_page }
+// Список заявок с фильтрами: { status, store_id, date_from, date_to, scope, sort, page, per_page }
 export function listWriteOffs(params) {
   return api.get(`/write-offs${qs(params)}`);
 }
@@ -42,8 +42,8 @@ export function getStats(scope) {
   return api.get(`/write-offs/stats${scope ? `?scope=${scope}` : ''}`);
 }
 
-// Сводная аналитика для дэшборда (admin/reviewer). Считается на сервере по всем
-// заявкам. params: { days, store_id }
+// Сводная аналитика для дэшборда (admin/reviewer) за выбранный период.
+// params: { days, store_id }
 export function getAnalytics(params) {
   return api.get(`/write-offs/analytics${qs(params)}`);
 }

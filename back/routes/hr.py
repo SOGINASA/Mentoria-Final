@@ -5,7 +5,7 @@ from datetime import timedelta
 from flask import Blueprint, jsonify, request
 
 from constants import ROLE_MANAGER, ROLE_SENDER
-from models import Store, User
+from models import Employee, Store, User
 from platform_models import (
     EmployeeDocumentRequest, LearningProgress, LeaveRequest, SupportCase, Timecard,
 )
@@ -49,32 +49,70 @@ def workspace():
 
     today = utcnow().date()
     active_leave = [item for item in LeaveRequest.query.filter_by(status='approved').all()
-                    if within_scope(item.store_id) and item.starts_on <= today <= item.ends_on]
+                    if item.requester_id in user_ids and within_scope(item.store_id)
+                    and item.starts_on <= today <= item.ends_on]
     active_leave_ids = {item.requester_id for item in active_leave}
 
-    employees = []
-    for item in users:
-        user_progress = progress_by_user.get(item.id, {})
+    directory_query = Employee.query.filter_by(is_active=True).order_by(Employee.full_name)
+    if selected_ids is not None:
+        directory_query = directory_query.filter(Employee.store_id.in_(list(selected_ids)))
+    directory_employees = directory_query.all()
+    user_by_employee_id = {item.employee_id: item for item in users if item.employee_id}
+    linked_user_ids = set()
+
+    def learning_payload(user):
+        user_progress = progress_by_user.get(user.id, {}) if user else {}
         required_complete = sum(
             1 for course_id in REQUIRED_COURSE_IDS
             if user_progress.get(course_id) and user_progress[course_id].assessment_passed
         )
+        return {
+            'completed_courses': sum(1 for row in user_progress.values() if row.assessment_passed),
+            'required_completed': required_complete,
+            'required_total': len(REQUIRED_COURSE_IDS),
+            'compliance_percent': round(required_complete * 100 / len(REQUIRED_COURSE_IDS)),
+        }
+
+    employees = []
+    for directory_employee in directory_employees:
+        user = user_by_employee_id.get(directory_employee.id)
+        if user:
+            linked_user_ids.add(user.id)
         employees.append({
-            'id': item.id,
-            'full_name': item.full_name,
-            'role': item.role,
-            'store_id': item.store_id,
-            'email': item.email,
-            'phone': item.phone,
-            'last_login': item.to_dict()['last_login'],
-            'on_leave': item.id in active_leave_ids,
-            'learning': {
-                'completed_courses': sum(1 for row in user_progress.values() if row.assessment_passed),
-                'required_completed': required_complete,
-                'required_total': len(REQUIRED_COURSE_IDS),
-                'compliance_percent': round(required_complete * 100 / len(REQUIRED_COURSE_IDS)),
-            },
+            'id': user.id if user else f'employee-{directory_employee.id}',
+            'user_id': user.id if user else None,
+            'employee_id': directory_employee.id,
+            'full_name': directory_employee.full_name,
+            'position': directory_employee.position,
+            'role': user.role if user else 'employee',
+            'store_id': directory_employee.store_id,
+            'email': user.email if user else None,
+            'phone': user.phone if user else None,
+            'last_login': user.to_dict()['last_login'] if user else None,
+            'has_account': user is not None,
+            'on_leave': bool(user and user.id in active_leave_ids),
+            'learning': learning_payload(user),
         })
+
+    for user in users:
+        if user.id in linked_user_ids:
+            continue
+        employees.append({
+            'id': user.id,
+            'user_id': user.id,
+            'employee_id': None,
+            'full_name': user.full_name,
+            'position': None,
+            'role': user.role,
+            'store_id': user.store_id,
+            'email': user.email,
+            'phone': user.phone,
+            'last_login': user.to_dict()['last_login'],
+            'has_account': True,
+            'on_leave': user.id in active_leave_ids,
+            'learning': learning_payload(user),
+        })
+    employees.sort(key=lambda item: item['full_name'].casefold())
 
     documents = [item for item in EmployeeDocumentRequest.query.filter_by(status='processing')
                  .order_by(EmployeeDocumentRequest.created_at).all() if within_scope(item.store_id)]
@@ -82,7 +120,8 @@ def workspace():
              .order_by(LeaveRequest.created_at).all() if within_scope(item.store_id)]
     upcoming_leave = [item for item in LeaveRequest.query.filter_by(status='approved')
                       .order_by(LeaveRequest.starts_on).all()
-                      if within_scope(item.store_id) and today <= item.starts_on <= today + timedelta(days=30)]
+                      if item.requester_id in user_ids and within_scope(item.store_id)
+                      and today <= item.starts_on <= today + timedelta(days=30)]
     cases = [item for item in SupportCase.query.filter(
         SupportCase.status.in_(('open', 'in_progress')), SupportCase.category == 'hr',
     ).all() if within_scope(item.store_id)]
@@ -110,8 +149,8 @@ def workspace():
         course_stats.append({
             'course_id': course_id,
             'completed': completed,
-            'total': len(users),
-            'percent': round(completed * 100 / len(users)) if users else 0,
+            'total': len(employees),
+            'percent': round(completed * 100 / len(employees)) if employees else 0,
             'required': course_id in REQUIRED_COURSE_IDS,
         })
 
@@ -130,7 +169,7 @@ def workspace():
             'open_hr_cases': len(cases),
         },
         'analytics': {
-            'active_employees': len(users),
+            'active_employees': len(employees),
             'on_leave': len(active_leave_ids),
             'pending_documents': len(documents),
             'pending_leave': len(leave),

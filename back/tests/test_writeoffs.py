@@ -1,5 +1,9 @@
 """Тесты заявок на списание: создание, валидация, approve/reject, Iiko, доступ."""
 
+from datetime import datetime, timedelta, timezone
+
+from models import WriteOff, db
+
 
 def _create_payload(store, employee=None, wo_type='no_deduction'):
     payload = {
@@ -135,6 +139,35 @@ def test_reviewer_sees_all(client, sender, reviewer, store, auth):
     assert resp.get_json()['pagination']['total'] == 1
 
 
+def test_reviewer_queue_supports_fifo_pagination(client, sender, reviewer, store, auth):
+    ids = []
+    base = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=3)
+    for index in range(3):
+        created = client.post('/api/write-offs', headers=auth(sender), json=_create_payload(store))
+        item = WriteOff.query.get(created.get_json()['write_off']['id'])
+        item.created_at = base + timedelta(hours=index)
+        ids.append(item.id)
+    db.session.commit()
+
+    first = client.get(
+        '/api/write-offs?status=pending&sort=oldest&page=1&per_page=2',
+        headers=auth(reviewer),
+    ).get_json()
+    second = client.get(
+        '/api/write-offs?status=pending&sort=oldest&page=2&per_page=2',
+        headers=auth(reviewer),
+    ).get_json()
+
+    assert first['pagination'] == {'page': 1, 'per_page': 2, 'total': 3, 'pages': 2}
+    assert [item['id'] for item in first['write_offs']] == ids[:2]
+    assert [item['id'] for item in second['write_offs']] == ids[2:]
+
+
+def test_writeoff_list_rejects_unknown_sort(client, reviewer, auth):
+    response = client.get('/api/write-offs?sort=unexpected', headers=auth(reviewer))
+    assert response.status_code == 400
+
+
 def test_stats(client, sender, reviewer, store, auth):
     client.post('/api/write-offs', headers=auth(sender), json=_create_payload(store))
     resp = client.get('/api/write-offs/stats', headers=auth(sender))
@@ -183,6 +216,27 @@ def test_analytics_days_param(client, sender, store, reviewer, auth):
     resp = client.get('/api/write-offs/analytics?days=30', headers=auth(reviewer))
     assert resp.status_code == 200
     assert len(resp.get_json()['trend']) == 30
+
+
+def test_analytics_days_filter_applies_to_all_metrics(client, sender, store, reviewer, auth):
+    recent = client.post('/api/write-offs', headers=auth(sender), json=_create_payload(store))
+    old = client.post('/api/write-offs', headers=auth(sender), json=_create_payload(store))
+    old_item = WriteOff.query.get(old.get_json()['write_off']['id'])
+    old_item.created_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=31)
+    db.session.commit()
+
+    client.post(
+        f"/api/write-offs/{old_item.id}/reject", headers=auth(reviewer),
+        json={'rejection_reason': 'Заявка слишком старая для выбранного периода'},
+    )
+    response = client.get('/api/write-offs/analytics?days=30', headers=auth(reviewer))
+    data = response.get_json()
+
+    assert data['totals'] == {'total': 1, 'pending': 1, 'approved': 0, 'rejected': 0}
+    assert data['no_hold'] == 1
+    assert data['by_store'][0]['count'] == 1
+    assert sum(day['count'] for day in data['trend']) == 1
+    assert recent.get_json()['write_off']['id'] != old_item.id
 
 
 def test_analytics_forbidden_for_sender(client, sender, auth):

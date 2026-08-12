@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import * as managerApi from '../../api/manager.api';
+import * as newsApi from '../../api/news.api';
 import Icon from '../../components/ui/Icon';
 import { submitManagerMutation } from '../../offline/managerMutationQueue';
 import { useAuthStore } from '../../store/authStore';
@@ -25,6 +25,7 @@ export default function PlatformNewsPage() {
   const news = usePlatformStore((state) => state.news);
   const permissions = usePlatformStore((state) => state.permissions);
   const markNewsRead = usePlatformStore((state) => state.markNewsRead);
+  const addNewsPost = usePlatformStore((state) => state.addNewsPost);
   const showToast = useUiStore((state) => state.showToast);
   const canManage = permissions.includes('news.manage');
   const [editorOpen, setEditorOpen] = useState(false);
@@ -35,11 +36,11 @@ export default function PlatformNewsPage() {
 
   useEffect(() => {
     if (!canManage) return;
-    managerApi.getWorkspace().then((workspace) => {
-      setStores(workspace.stores || []);
-      setForm((current) => ({ ...current, storeId: current.storeId || String(workspace.stores?.[0]?.id || '') }));
-    }).catch(() => {});
-  }, [canManage]);
+    newsApi.getManageContext().then((context) => {
+      setStores(context.stores || []);
+      setForm((current) => ({ ...current, storeId: current.storeId || String(context.stores?.[0]?.id || '') }));
+    }).catch((requestError) => showToast(requestError.message || 'Не удалось загрузить доступные точки'));
+  }, [canManage, showToast]);
 
   function openArticle(article) {
     setSelected(article);
@@ -64,6 +65,7 @@ export default function PlatformNewsPage() {
         category: form.category, audience_role: form.audienceRole || undefined,
         store_id: Number(form.storeId), status,
       } }, userId);
+      if (!result.queued) addNewsPost(result.post);
       setEditorOpen(false);
       setForm((current) => ({ title: '', excerpt: '', body: '', category: 'Операции', audienceRole: '', storeId: current.storeId }));
       showToast(result.queued ? 'Нет сети: новость сохранена в очереди' : status === 'published' ? 'Новость опубликована' : 'Черновик сохранён');

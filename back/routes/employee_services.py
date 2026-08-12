@@ -32,6 +32,9 @@ def _parse_date(value, field):
 def _can_manage(manager, item):
     if not has_permission(manager, 'employee_services.manage'):
         return False
+    owner_id = getattr(item, 'requester_id', None) or getattr(item, 'user_id', None)
+    if owner_id == manager.id:
+        return False
     if item.store_id is None:
         return scoped_store_ids(manager) is None
     return can_access_store(manager, item.store_id, 'employee_services.manage')
@@ -207,6 +210,8 @@ def manager_document_requests():
 def decide_document_request(request_id):
     manager = get_current_user()
     item = EmployeeDocumentRequest.query.get_or_404(request_id)
+    if item.user_id == manager.id:
+        return jsonify({'error': 'Нельзя обработать собственный запрос документа'}), 403
     if not _can_manage(manager, item):
         return jsonify({'error': 'Нет доступа к заявке'}), 403
     data = request.get_json(silent=True) or {}
@@ -250,6 +255,8 @@ def manager_leave_requests():
 def decide_leave_request(request_id):
     manager = get_current_user()
     item = LeaveRequest.query.get_or_404(request_id)
+    if item.requester_id == manager.id:
+        return jsonify({'error': 'Нельзя согласовать собственную заявку на отсутствие'}), 403
     if not _can_manage(manager, item):
         return jsonify({'error': 'Нет доступа к заявке'}), 403
     data = request.get_json(silent=True) or {}

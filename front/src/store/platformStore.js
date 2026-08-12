@@ -245,6 +245,11 @@ export const usePlatformStore = create(
           ? { ...post, is_read: true } : post) }));
       },
 
+      addNewsPost(post) {
+        if (!post) return;
+        set((state) => ({ news: [post, ...state.news.filter((item) => item.id !== post.id)] }));
+      },
+
       async completeLearningModule(courseId, moduleId) {
         const result = await employeeServicesApi.completeModule(courseId, moduleId);
         const normalized = normalizeLearningProgress([result.progress]);

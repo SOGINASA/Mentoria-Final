@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from constants import ROLE_MANAGER, ROLE_SENDER
+from constants import ROLE_HR, ROLE_MANAGER, ROLE_SENDER
 from models import Notification, Store, User, db
 from platform_models import AuditEvent, EmployeeDocumentRequest, LeaveRequest
 
@@ -166,6 +166,49 @@ def test_leave_request_state_machine_balance_and_audit(client, sender, manager, 
     assert cancelled.status_code == 200
     assert cancelled.get_json()['request']['status'] == 'cancelled'
     assert LeaveRequest.query.filter_by(status='cancelled').count() == 1
+
+
+def test_hr_cannot_process_own_employee_service_requests(client, app, auth):
+    hr = User(username='self-service-hr', full_name='HR сотрудник', role=ROLE_HR)
+    hr.set_password('secret123')
+    db.session.add(hr)
+    db.session.commit()
+
+    document = client.post(
+        '/api/employee-services/documents/requests', headers=auth(hr),
+        json={'document_id': 'employment'},
+    ).get_json()['request']
+    starts_on, ends_on = future_range(offset=90, days=2)
+    leave = client.post(
+        '/api/employee-services/leave/requests', headers=auth(hr), json={
+            'leave_type': 'unpaid', 'starts_on': starts_on, 'ends_on': ends_on,
+        },
+    ).get_json()['request']
+
+    document_queue = client.get(
+        '/api/employee-services/manager/documents/requests', headers=auth(hr),
+    ).get_json()['requests']
+    leave_queue = client.get(
+        '/api/employee-services/manager/leave/requests', headers=auth(hr),
+    ).get_json()['requests']
+    assert document_queue == []
+    assert leave_queue == []
+
+    document_decision = client.post(
+        f"/api/employee-services/manager/documents/requests/{document['request_id']}/decision",
+        headers=auth(hr), json={
+            'decision': 'ready', 'version': document['version'],
+            'file_url': 'https://documents.example/own-request',
+        },
+    )
+    leave_decision = client.post(
+        f"/api/employee-services/manager/leave/requests/{leave['request_id']}/decision",
+        headers=auth(hr), json={'decision': 'approved', 'version': leave['version']},
+    )
+    assert document_decision.status_code == 403
+    assert leave_decision.status_code == 403
+    assert db.session.get(EmployeeDocumentRequest, document['request_id']).status == 'processing'
+    assert db.session.get(LeaveRequest, leave['request_id']).status == 'pending'
 
 
 def test_leave_approval_rechecks_balance_after_another_request_is_approved(
