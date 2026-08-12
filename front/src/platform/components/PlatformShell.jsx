@@ -6,7 +6,7 @@ import Toast from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifyStore } from '../../store/notifyStore';
 import { initials } from '../../utils/format';
-import { HOME_ROUTE_BY_ROLE } from '../../constants/roles';
+import { LEGACY_HOME_ROUTE_BY_ROLE } from '../../constants/roles';
 import { usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
 import {
@@ -86,7 +86,7 @@ function PlatformSidebar() {
       <div className="flex-1" />
       <button
         type="button"
-        onClick={() => navigate(HOME_ROUTE_BY_ROLE[user?.role] || '/')}
+        onClick={() => navigate(LEGACY_HOME_ROUTE_BY_ROLE[user?.role] || '/')}
         className="mb-3 flex min-h-12 items-center gap-3 rounded-2xl border border-line bg-surface2 px-3.5 text-left text-[13px] font-semibold text-muted transition-colors hover:border-green hover:text-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
       >
         <Icon name="arrowSwap" size={19} />

@@ -26,6 +26,7 @@ const PlatformIncomePage = lazy(() => import('../platform/pages/PlatformIncomePa
 const PlatformTasksPage = lazy(() => import('../platform/pages/PlatformTasksPage'));
 const PlatformApprovalsPage = lazy(() => import('../platform/pages/PlatformApprovalsPage'));
 const PlatformManagerPage = lazy(() => import('../platform/pages/PlatformManagerPage'));
+const PlatformReviewerPage = lazy(() => import('../platform/pages/PlatformReviewerPage'));
 const PlatformProfilePage = lazy(() => import('../platform/pages/PlatformProfilePage'));
 const PlatformNotificationsPage = lazy(() => import('../platform/pages/PlatformNotificationsPage'));
 const PlatformSupportPage = lazy(() => import('../platform/pages/PlatformSupportPage'));
@@ -73,6 +74,7 @@ export default function AppRouter() {
         <Route path="tasks" element={platformPage(<PlatformTasksPage />)} />
         <Route path="approvals" element={platformPage(<PlatformApprovalsPage />)} />
         <Route path="management" element={platformPage(<PlatformManagerPage />)} />
+        <Route path="control" element={reviewer(platformPage(<PlatformReviewerPage />))} />
         <Route path="profile" element={platformPage(<PlatformProfilePage />)} />
         <Route path="notifications" element={platformPage(<PlatformNotificationsPage />)} />
         <Route path="support" element={platformPage(<PlatformSupportPage />)} />

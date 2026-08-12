@@ -41,12 +41,25 @@ describe('staff platform route contract', () => {
       today: 'Сегодня', approvals: 'Согласования', shifts: 'Смены', income: 'Доход',
       tasks: 'Задачи', services: 'Сервисы',
     };
-    const permissions = ['manager.queue'];
+    const permissions = ['manager.queue', 'shifts.manage'];
 
     expect(createPlatformNavigation(copy, 0, permissions).some((item) => item.to === PLATFORM_ROUTES.approvals)).toBe(true);
     expect(createPlatformMobileNavigation(copy, 0, permissions)).toHaveLength(5);
     expect(createPlatformMobileNavigation(copy, 0, permissions).some((item) => item.to === PLATFORM_ROUTES.management)).toBe(true);
     expect(createPlatformMobileNavigation(copy, 0, permissions).some((item) => item.to === PLATFORM_ROUTES.income)).toBe(true);
+  });
+
+  test('reviewer receives a dedicated control workspace and compact mobile navigation', () => {
+    const copy = {
+      today: 'Сегодня', control: 'Контроль', approvals: 'Согласования', shifts: 'Смены',
+      income: 'Доход', tasks: 'Задачи', services: 'Сервисы',
+    };
+    const permissions = ['manager.queue', 'reviewer.control', 'tasks.manage', 'time.manage'];
+    const mobile = createPlatformMobileNavigation(copy, 2, permissions);
+
+    expect(mobile).toHaveLength(5);
+    expect(mobile.some((item) => item.to === PLATFORM_ROUTES.control)).toBe(true);
+    expect(mobile.some((item) => item.to === PLATFORM_ROUTES.management)).toBe(false);
   });
 
   test('income remains discoverable while payroll integration is unavailable', () => {
@@ -59,7 +72,7 @@ describe('staff platform route contract', () => {
 
   test('AppRouter declares every platform destination', () => {
     const source = fs.readFileSync(require.resolve('./AppRouter'), 'utf8');
-    const routeSegments = ['', 'shifts', 'income', 'tasks', 'approvals', 'management', 'profile', 'notifications', 'support', 'news', 'services', 'learning', 'documents', 'leave', 'writeoff'];
+    const routeSegments = ['', 'shifts', 'income', 'tasks', 'approvals', 'management', 'control', 'profile', 'notifications', 'support', 'news', 'services', 'learning', 'documents', 'leave', 'writeoff'];
 
     expect(source).toContain('path="/app"');
     routeSegments.filter(Boolean).forEach((segment) => {

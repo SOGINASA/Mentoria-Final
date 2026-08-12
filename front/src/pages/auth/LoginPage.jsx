@@ -13,6 +13,7 @@ import BiometricScanOverlay from '../../components/biometric/BiometricScanOverla
 // Демо-учётки бэкенда (back/seed_data.py)
 const DEMO = {
   sender: { identifier: 'sender1', password: 'sender123' },
+  manager: { identifier: 'manager', password: 'manager123' },
   reviewer: { identifier: 'reviewer', password: 'reviewer123' },
   admin: { identifier: 'admin', password: 'admin12345' },
 };
@@ -190,13 +191,20 @@ export default function LoginPage() {
               <span className="flex-1 h-px bg-line" />
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <button
                 type="button"
                 onClick={() => submit(DEMO.sender)}
                 className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
               >
                 {t.role_sender}
+              </button>
+              <button
+                type="button"
+                onClick={() => submit(DEMO.manager)}
+                className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
+              >
+                {t.role_manager}
               </button>
               <button
                 type="button"

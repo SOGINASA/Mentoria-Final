@@ -5,6 +5,7 @@ export const PLATFORM_ROUTES = Object.freeze({
   tasks: '/app/tasks',
   approvals: '/app/approvals',
   management: '/app/management',
+  control: '/app/control',
   profile: '/app/profile',
   notifications: '/app/notifications',
   support: '/app/support',
@@ -62,12 +63,17 @@ export function canManageApprovals(permissions = []) {
 }
 
 export function canManageWorkspace(permissions = []) {
-  return permissions.includes('*') || permissions.includes('manager.queue');
+  return permissions.includes('*') || (permissions.includes('manager.queue') && permissions.includes('shifts.manage'));
+}
+
+export function canUseReviewerControl(permissions = []) {
+  return permissions.includes('*') || permissions.includes('reviewer.control');
 }
 
 export function createPlatformNavigation(copy, pendingTaskCount = 0, permissions = []) {
   return [
     { to: PLATFORM_ROUTES.home, end: true, icon: 'home', label: copy.today },
+    ...(canUseReviewerControl(permissions) ? [{ to: PLATFORM_ROUTES.control, icon: 'shieldCheck', label: copy.control }] : []),
     ...(canManageWorkspace(permissions) ? [{ to: PLATFORM_ROUTES.management, icon: 'briefcase', label: copy.management }] : []),
     ...(canManageApprovals(permissions) ? [{ to: PLATFORM_ROUTES.approvals, icon: 'queue', label: copy.approvals }] : []),
     { to: PLATFORM_ROUTES.shifts, icon: 'calendar', label: copy.shifts },
@@ -89,6 +95,12 @@ export function createPlatformNavigation(copy, pendingTaskCount = 0, permissions
 
 export function createPlatformMobileNavigation(copy, pendingTaskCount = 0, permissions = []) {
   const navigation = createPlatformNavigation(copy, pendingTaskCount, permissions);
+  if (canUseReviewerControl(permissions)) {
+    return navigation.filter((item) => [
+      PLATFORM_ROUTES.home, PLATFORM_ROUTES.control, PLATFORM_ROUTES.approvals,
+      PLATFORM_ROUTES.tasks, PLATFORM_ROUTES.services,
+    ].includes(item.to));
+  }
   return canManageWorkspace(permissions)
     ? navigation.filter((item) => ![PLATFORM_ROUTES.shifts, PLATFORM_ROUTES.tasks].includes(item.to))
     : navigation;
@@ -119,6 +131,7 @@ export function getPlatformRouteTitle(pathname, copy) {
     [PLATFORM_ROUTES.tasks]: copy.tasks,
     [PLATFORM_ROUTES.approvals]: copy.approvals,
     [PLATFORM_ROUTES.management]: copy.management,
+    [PLATFORM_ROUTES.control]: copy.control,
     [PLATFORM_ROUTES.profile]: copy.profile,
     [PLATFORM_ROUTES.notifications]: copy.notifications,
     [PLATFORM_ROUTES.support]: copy.support,

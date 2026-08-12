@@ -22,7 +22,7 @@ ROLE_PERMISSIONS = {
     ROLE_REVIEWER: {'platform.use', 'shifts.read_own', 'time.track_own', 'time.read_own',
                     'time.manage', 'tasks.read_own', 'tasks.complete_own',
                     'tasks.manage', 'cases.create', 'cases.read_own', 'news.read',
-                    'manager.queue', 'employee_services.use'},
+                    'manager.queue', 'reviewer.control', 'employee_services.use'},
     ROLE_HR: {'platform.use', 'cases.manage', 'news.read', 'news.manage', 'time.read_all',
               'employee_services.use', 'employee_services.manage'},
     ROLE_FINANCE: {'platform.use', 'time.read_all', 'income.read', 'news.read',

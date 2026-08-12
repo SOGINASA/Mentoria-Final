@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 
 from models import db, User, Store, Employee, WriteOff, WriteOffPhoto, WriteOffItem, Notification
 from constants import (
-    ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN,
+    ROLE_SENDER, ROLE_MANAGER, ROLE_REVIEWER, ROLE_ADMIN,
     STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED,
     TYPE_NO_DEDUCTION, TYPE_WITH_DEDUCTION, SOURCE_MANUAL, SOURCE_AUTO_FALL,
     IIKO_SYNCED,
@@ -102,8 +102,7 @@ def seed_employees(stores):
 
 
 def seed_users(stores):
-    """Демо-пользователи: админ, проверяющий и отправители.
-    Отправители привязываются к первым точкам из CSV."""
+    """Демо-пользователи всех базовых ролей с фиксированными данными входа."""
     admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
     admin_password = os.environ.get('ADMIN_PASSWORD', 'admin12345')
 
@@ -112,6 +111,16 @@ def seed_users(stores):
 
     store1 = stores[0] if len(stores) > 0 else None
     store2 = stores[1] if len(stores) > 1 else None
+    manager = _get_or_create_user(
+        'manager', 'manager123', 'Менеджер Первой Точки', ROLE_MANAGER, store=store1,
+    )
+    # Старую локальную базу seed обновляет без удаления данных. Поэтому
+    # существующему демо-менеджеру восстанавливаем ожидаемую роль и точку.
+    manager.role = ROLE_MANAGER
+    manager.is_active = True
+    manager.set_password('manager123')
+    if store1:
+        manager.store_id = store1.id
     sender1 = _get_or_create_user('sender1', 'sender123', 'Отправитель Первый', ROLE_SENDER, store=store1)
     sender2 = _get_or_create_user('sender2', 'sender123', 'Отправитель Второй', ROLE_SENDER, store=store2)
     # Демо-аккаунты явно связаны с сотрудниками: это обеспечивает режим
@@ -325,7 +334,7 @@ def seed_all():
     seed_write_offs(stores)
     seed_notifications(stores)
     print('[seed] Точки, сотрудники и демо-пользователи готовы.')
-    print('[seed] Логины: admin/admin12345, reviewer/reviewer123, sender1/sender123, sender2/sender123')
+    print('[seed] Логины: admin/admin12345, reviewer/reviewer123, manager/manager123, sender1/sender123, sender2/sender123')
 
 
 if __name__ == '__main__':
