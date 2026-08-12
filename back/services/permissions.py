@@ -28,7 +28,7 @@ ROLE_PERMISSIONS = {
     ROLE_FINANCE: {'platform.use', 'finance.workspace', 'time.read_all', 'income.read',
                    'cases.manage', 'news.read',
                    'employee_services.use'},
-    ROLE_OPERATIONS: {'platform.use', 'shifts.manage', 'time.manage', 'tasks.manage',
+    ROLE_OPERATIONS: {'platform.use', 'operations.workspace', 'shifts.manage', 'time.manage', 'tasks.manage',
                       'cases.manage', 'news.read', 'news.manage', 'manager.queue',
                       'employee_services.use', 'employee_services.manage'},
     ROLE_ADMIN: {'*'},
