@@ -44,7 +44,9 @@
 
 - Реализовать проверяемые QR/PIN credential flows (поле `method` уже зарезервировано).
 - Добавить фоновые дедлайн/overdue-уведомления и полноценный обмен смен между двумя сотрудниками.
-- Собрать manager UI поверх готовых manager endpoints и offline retry queue для мобильных клиентов.
+- [x] Собрать manager UI поверх manager endpoints и сохраняемую offline retry
+  queue. Действия менеджера записываются в `localStorage`, повторяются при
+  восстановлении сети и защищены серверными `Idempotency-Key` receipts.
 - Перенести production с SQLite на PostgreSQL и провести нагрузочные/security проверки.
 
 ### 1. Foundation
@@ -62,7 +64,7 @@
 ### 2. Смены
 
 - [x] `shifts`, `shift_assignments`, `shift_requests`.
-- [ ] CRUD/публикация/назначения для менеджера.
+- [x] CRUD/публикация/назначения для менеджера.
 - [x] Календарь, открытые смены, подтверждение и запросы для сотрудника.
 - [x] Защита от пересечений, двойного назначения и конкурентного одобрения.
 - [x] Уведомления о публикации и решении по запросу.
@@ -97,7 +99,8 @@
 - [x] Добавить API-модули platform/shifts/time/tasks/cases.
 - [x] Заменить `INITIAL_PLATFORM_TASKS` и локальные запросы реальными вызовами.
 - [x] Удалить hardcoded смены; доход скрыть flag до подключения payroll.
-- [ ] Оставить optimistic UI и offline queue с idempotency keys.
+- [x] Добавить offline retry queue для manager workflows с idempotency keys;
+  неустранимые 4xx-конфликты показываются отдельно и требуют ручного повтора.
 - [x] Скрывать незавершённые модули feature flags, не показывать ложный успех.
 
 ### 7. Payroll/HR — после Workday MVP

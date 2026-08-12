@@ -71,6 +71,30 @@ class AuditEvent(db.Model):
                 'created_at': _utc_iso(self.created_at)}
 
 
+class MutationReceipt(db.Model):
+    """Result of an idempotent mobile/web mutation.
+
+    The response is committed in the same transaction as the domain change, so
+    a retried request can safely return the original result without repeating
+    notifications or creating duplicate records.
+    """
+
+    __tablename__ = 'mutation_receipts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    idempotency_key = db.Column(db.String(120), nullable=False)
+    method = db.Column(db.String(10), nullable=False)
+    path = db.Column(db.String(255), nullable=False)
+    status_code = db.Column(db.Integer, nullable=False)
+    response_json = db.Column(db.JSON, nullable=False, default=dict)
+    created_at = db.Column(db.DateTime, default=_now, nullable=False, index=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'idempotency_key', name='uq_mutation_receipt_user_key'),
+    )
+
+
 class Shift(db.Model):
     __tablename__ = 'shifts'
 

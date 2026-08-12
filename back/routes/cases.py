@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required
 from models import db
 from platform_models import CaseMessage, SupportCase
 from services.audit import audit
+from services.idempotency import idempotent_mutation
 from services.notifications import notify
 from services.permissions import can_access_store, has_permission
 from utils.auth_helpers import get_current_user
@@ -56,6 +57,7 @@ def create_case():
 
 @cases_bp.post('/<int:case_id>/messages')
 @jwt_required()
+@idempotent_mutation
 def add_message(case_id):
     user = get_current_user()
     item = SupportCase.query.get_or_404(case_id)
@@ -66,18 +68,19 @@ def add_message(case_id):
         return jsonify({'error': 'Сообщение не может быть пустым'}), 400
     message = CaseMessage(case_id=item.id, author_id=user.id, body=body)
     item.updated_at = utcnow()
-    db.session.add(message)
+    item.messages.append(message)
     if user.id != item.author_id:
         notify(item.author_id, 'case_message', 'Ответ по обращению', body=item.subject,
                entity_type='support_case', entity_id=item.id,
                action_url='/app/support', commit=False)
     audit(user, 'case.message_added', 'support_case', item.id, item.store_id)
-    db.session.commit()
+    db.session.flush()
     return jsonify({'case': item.to_dict()}), 201
 
 
 @cases_bp.patch('/<int:case_id>')
 @jwt_required()
+@idempotent_mutation
 def update_case(case_id):
     user = get_current_user()
     item = SupportCase.query.get_or_404(case_id)
@@ -91,5 +94,4 @@ def update_case(case_id):
     item.updated_at = utcnow()
     audit(user, 'case.updated', 'support_case', item.id, item.store_id,
           {'status': item.status})
-    db.session.commit()
     return jsonify({'case': item.to_dict()})

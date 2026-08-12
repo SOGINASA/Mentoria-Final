@@ -57,6 +57,25 @@ def test_manager_account_requires_credentials_and_store(client, admin, store, au
     assert created.status_code == 201
     assert created.get_json()['user']['role'] == ROLE_MANAGER
 
+    # Сквозной контракт: созданные администратором данные сразу подходят для
+    # входа, а выданный токен открывает scoped-кабинет менеджера.
+    login = client.post('/api/auth/login', json={
+        'identifier': 'manager.new', 'password': 'secret123',
+    })
+    assert login.status_code == 200
+    login_data = login.get_json()
+    assert login_data['user']['role'] == ROLE_MANAGER
+    manager_headers = {'Authorization': f"Bearer {login_data['access_token']}"}
+
+    me = client.get('/api/auth/me', headers=manager_headers)
+    assert me.status_code == 200
+    assert 'manager.queue' in me.get_json()['permissions']
+    assert me.get_json()['scopes']['store_ids'] == [store.id]
+
+    workspace = client.get('/api/manager/workspace', headers=manager_headers)
+    assert workspace.status_code == 200
+    assert [item['id'] for item in workspace.get_json()['stores']] == [store.id]
+
 
 def test_change_password(client, sender, auth):
     resp = client.post('/api/auth/change-password',

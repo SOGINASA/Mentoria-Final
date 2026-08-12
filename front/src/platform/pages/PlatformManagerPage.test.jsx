@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import * as managerApi from '../../api/manager.api';
+import { useAuthStore } from '../../store/authStore';
 import PlatformManagerPage from './PlatformManagerPage';
 
 jest.mock('../../api/manager.api');
@@ -13,6 +14,8 @@ const WORKSPACE = {
 
 describe('manager workspace', () => {
   beforeEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({ user: { id: 55, role: 'manager' }, status: 'authed' });
     managerApi.getWorkspace.mockResolvedValue(WORKSPACE);
     managerApi.createTask.mockResolvedValue({ task: { id: 11 } });
   });
@@ -30,7 +33,7 @@ describe('manager workspace', () => {
 
     await waitFor(() => expect(managerApi.createTask).toHaveBeenCalledWith(expect.objectContaining({
       title: 'Проверить открытие точки', store_id: 1, assignee_id: 7,
-    })));
+    }), expect.any(String)));
   });
 
   test('requires confirmation and reason before cancelling a shift', async () => {
@@ -50,6 +53,6 @@ describe('manager workspace', () => {
 
     await waitFor(() => expect(managerApi.cancelShift).toHaveBeenCalledWith(9, {
       version: 2, reason: 'Точка закрыта на обслуживание',
-    }));
+    }, expect.any(String)));
   });
 });

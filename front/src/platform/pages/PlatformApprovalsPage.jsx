@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as managerApi from '../../api/manager.api';
 import Icon from '../../components/ui/Icon';
 import Spinner from '../../components/ui/Spinner';
+import { FLUSH_EVENT, submitManagerMutation } from '../../offline/managerMutationQueue';
+import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
 import { usePlatformStore } from '../../store/platformStore';
 import PlatformModal from '../components/PlatformModal';
@@ -92,22 +94,24 @@ async function loadQueue(permissions) {
   return queue;
 }
 
-async function submitDecision(type, item, action, reason, fileUrl) {
+async function submitDecision(type, item, action, reason, fileUrl, ownerId) {
   const common = { version: item.version, reason: reason.trim() || undefined };
   const id = requestId(type, item);
-  if (type === 'shift_requests') return managerApi.decideShiftRequest(id, { ...common, decision: action });
-  if (type === 'timecards') return managerApi.decideTimecard(id, { ...common, decision: action });
-  if (type === 'time_corrections') return managerApi.decideTimeCorrection(id, { ...common, decision: action });
-  if (type === 'tasks') return managerApi.reviewTask(id, { ...common, decision: action });
-  if (type === 'leave_requests') return managerApi.decideLeaveRequest(id, { ...common, decision: action });
-  return managerApi.decideDocumentRequest(id, {
+  const actionTypes = {
+    shift_requests: 'decision.shift', timecards: 'decision.timecard',
+    time_corrections: 'decision.correction', tasks: 'decision.task',
+    leave_requests: 'decision.leave', document_requests: 'decision.document',
+  };
+  const body = type === 'document_requests' ? {
     ...common,
     decision: action === 'approved' ? 'ready' : 'rejected',
     file_url: action === 'approved' ? fileUrl.trim() : undefined,
-  });
+  } : { ...common, decision: action };
+  return submitManagerMutation(actionTypes[type], { id, body }, ownerId);
 }
 
 export default function PlatformApprovalsPage() {
+  const userId = useAuthStore((state) => state.user?.id);
   const hydrated = usePlatformStore((state) => state.hydrated);
   const permissions = usePlatformStore((state) => state.permissions);
   const showToast = useUiStore((state) => state.showToast);
@@ -136,6 +140,11 @@ export default function PlatformApprovalsPage() {
 
   useEffect(() => {
     reload();
+  }, [reload]);
+
+  useEffect(() => {
+    window.addEventListener(FLUSH_EVENT, reload);
+    return () => window.removeEventListener(FLUSH_EVENT, reload);
   }, [reload]);
 
   const groups = useMemo(() => Object.entries(queue).filter(([, items]) => items.length), [queue]);
@@ -167,12 +176,12 @@ export default function PlatformApprovalsPage() {
     setSubmitting(true);
     setFormError('');
     try {
-      await submitDecision(decision.type, decision.item, decision.action, reason, fileUrl);
+      const result = await submitDecision(decision.type, decision.item, decision.action, reason, fileUrl, userId);
       setQueue((current) => ({
         ...current,
         [decision.type]: current[decision.type].filter((item) => requestId(decision.type, item) !== requestId(decision.type, decision.item)),
       }));
-      showToast(decision.action === 'approved' ? 'Решение подтверждено' : 'Заявка возвращена сотруднику');
+      showToast(result.queued ? 'Нет сети: решение сохранено в очереди' : decision.action === 'approved' ? 'Решение подтверждено' : 'Заявка возвращена сотруднику');
       setDecision(null);
     } catch (requestError) {
       setFormError(requestError.message || 'Не удалось сохранить решение');
