@@ -12,7 +12,7 @@ import { initials, dateLabel } from '../../utils/format';
 import { STATUS_PENDING } from '../../constants/statuses';
 import { IIKO_SYNCED, IIKO_FAILED } from '../../constants/iiko';
 
-export default function ReviewDetailPage() {
+export default function ReviewDetailPage({ basePath = '/review' }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, lang } = useI18n();
@@ -43,7 +43,7 @@ export default function ReviewDetailPage() {
       setModal(null);
       showToast(t.approved_toast);
       fetchStats();
-      navigate('/review', { replace: true });
+      navigate(basePath, { replace: true });
     } catch (e) {
       showToast(e.message || t.error_toast);
     }
@@ -56,7 +56,7 @@ export default function ReviewDetailPage() {
       setModal(null);
       showToast(t.rejected_toast);
       fetchStats();
-      navigate('/review', { replace: true });
+      navigate(basePath, { replace: true });
     } catch (e) {
       showToast(e.message || t.error_toast);
     }

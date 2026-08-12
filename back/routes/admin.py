@@ -4,6 +4,7 @@
 from flask import Blueprint, request, jsonify
 
 from models import db, User, Store, Employee
+from platform_models import UserStoreScope
 from utils.auth_helpers import role_required
 from utils.validators import validate_username, validate_email
 from constants import ROLE_ADMIN, ROLE_MANAGER, ROLE_REVIEWER, ROLE_SENDER, ROLES
@@ -20,7 +21,16 @@ def list_users():
     if role:
         query = query.filter_by(role=role)
     users = query.order_by(User.created_at.desc()).all()
-    return jsonify({'users': [u.to_dict() for u in users]})
+    scopes_by_user = {}
+    if users:
+        for item in UserStoreScope.query.filter(UserStoreScope.user_id.in_([u.id for u in users])).all():
+            scopes_by_user.setdefault(item.user_id, []).append(item.to_dict())
+    result = []
+    for user in users:
+        value = user.to_dict()
+        value['store_scopes'] = scopes_by_user.get(user.id, [])
+        result.append(value)
+    return jsonify({'users': result})
 
 
 @admin_bp.route('/users', methods=['POST'])

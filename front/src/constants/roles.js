@@ -15,11 +15,10 @@ export const HOME_ROUTE_BY_ROLE = {
   [ROLE_HR]: '/app/hr',
   [ROLE_FINANCE]: '/app/finance',
   [ROLE_OPERATIONS]: '/app/operations',
-  [ROLE_ADMIN]: '/admin',
+  [ROLE_ADMIN]: '/app/admin',
 };
 
 export const LEGACY_HOME_ROUTE_BY_ROLE = {
   [ROLE_SENDER]: '/',
   [ROLE_REVIEWER]: '/review',
-  [ROLE_ADMIN]: '/admin',
 };

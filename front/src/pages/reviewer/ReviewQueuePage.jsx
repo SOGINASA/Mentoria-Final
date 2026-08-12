@@ -11,7 +11,7 @@ import { useWriteOffStore } from '../../store/writeOffStore';
 import { initials, dateLabel } from '../../utils/format';
 import { STATUS_PENDING } from '../../constants/statuses';
 
-export default function ReviewQueuePage() {
+export default function ReviewQueuePage({ basePath = '/review' }) {
   const navigate = useNavigate();
   const { t, lang } = useI18n();
   const { list, listLoading, stats, fetchList, fetchStats } = useWriteOffStore();
@@ -55,7 +55,7 @@ export default function ReviewQueuePage() {
           {list.map((wo) => (
             <button
               key={wo.id}
-              onClick={() => navigate(`/review/${wo.id}`)}
+              onClick={() => navigate(`${basePath}/${wo.id}`)}
               className="flex gap-3.5 bg-surface border border-line rounded-2xl p-3.5 cursor-pointer text-left shadow-card-sm hover:-translate-y-0.5 hover:shadow-card transition"
             >
               <PhotoTile url={wo.photos?.[0]?.url} className="w-[66px] h-[66px] flex-none" iconSize={28} />

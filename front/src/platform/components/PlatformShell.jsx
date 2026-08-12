@@ -34,14 +34,16 @@ function usePlatformNav() {
     state.tasks.filter((task) => !task.done).length
   ));
   const permissions = usePlatformStore((state) => state.permissions);
-  return createPlatformNavigation(p, pendingTaskCount, permissions);
+  const role = useAuthStore((state) => state.user?.role);
+  return createPlatformNavigation(p, pendingTaskCount, role === ROLE_ADMIN ? ['*'] : permissions);
 }
 
 function usePlatformMobileNav() {
   const { p } = usePlatformCopy();
   const pendingTaskCount = usePlatformStore((state) => state.tasks.filter((task) => !task.done).length);
   const permissions = usePlatformStore((state) => state.permissions);
-  return createPlatformMobileNavigation(p, pendingTaskCount, permissions);
+  const role = useAuthStore((state) => state.user?.role);
+  return createPlatformMobileNavigation(p, pendingTaskCount, role === ROLE_ADMIN ? ['*'] : permissions);
 }
 
 function PlatformSidebar() {

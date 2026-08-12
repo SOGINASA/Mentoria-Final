@@ -14,6 +14,9 @@ import {
   ROLE_OPERATIONS, ROLE_ADMIN,
 } from '../../constants/roles';
 import AdminAnalytics from './AdminAnalytics';
+import AdminOverview from './AdminOverview';
+import FeatureFlagsPanel from './FeatureFlagsPanel';
+import AuditPanel from './AuditPanel';
 
 const ROLE_BADGE = {
   [ROLE_ADMIN]: { bg: 'var(--orange-tint)', fg: 'var(--orange)' },
@@ -29,12 +32,14 @@ export default function AdminPage() {
   const { t } = useI18n();
   const showToast = useUiStore((s) => s.showToast);
 
-  const [tab, setTab] = useState('analytics');
+  const [tab, setTab] = useState('overview');
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
   const [sheet, setSheet] = useState(null); // { mode, entity }
+  const [pendingDeactivate, setPendingDeactivate] = useState(null);
 
   const roleLabel = (r) => ({
     [ROLE_SENDER]: t.role_sender, [ROLE_MANAGER]: 'Менеджер',
@@ -76,12 +81,17 @@ export default function AdminPage() {
   }, [loadStores, loadEmployees]);
 
   async function onDeactivate(kind, id) {
-    if (!window.confirm(t.admin_deactivate_q)) return;
+    setPendingDeactivate({ kind, id });
+  }
+
+  async function confirmDeactivate() {
+    const { kind, id } = pendingDeactivate;
     try {
       if (kind === 'users') await adminApi.deactivateUser(id);
       if (kind === 'stores') await adminApi.deactivateStore(id);
       if (kind === 'employees') await adminApi.deactivateEmployee(id);
       showToast(t.admin_inactive);
+      setPendingDeactivate(null);
       reload();
     } catch (e) {
       showToast(e.message || t.error_toast);
@@ -89,19 +99,27 @@ export default function AdminPage() {
   }
 
   const tabs = [
-    { key: 'analytics', label: t.nav_analytics },
+    { key: 'overview', label: 'Обзор системы' },
     { key: 'users', label: 'Аккаунты и роли' },
     { key: 'stores', label: t.admin_stores },
     { key: 'employees', label: 'Справочник iiko' },
+    { key: 'flags', label: 'Доступность функций' },
+    { key: 'audit', label: 'Журнал действий' },
+    { key: 'analytics', label: 'Аналитика списаний' },
   ];
 
   const addLabel = tab === 'users' ? t.admin_add_user : tab === 'stores' ? t.admin_add_store : t.admin_add_emp;
   const count = tab === 'users' ? users.length : tab === 'stores' ? stores.length : employees.length;
   const countWord = tab === 'users' ? t.cnt_users : tab === 'stores' ? t.cnt_stores : t.cnt_emps;
+  const isDirectoryTab = ['users', 'stores', 'employees'].includes(tab);
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredUsers = users.filter((item) => [item.full_name, item.username, item.store?.name, roleLabel(item.role)].some((value) => String(value || '').toLowerCase().includes(normalizedSearch)));
+  const filteredStores = stores.filter((item) => [item.name, item.address, item.iiko_store_id].some((value) => String(value || '').toLowerCase().includes(normalizedSearch)));
+  const filteredEmployees = employees.filter((item) => [item.full_name, item.position, stores.find((store) => store.id === item.store_id)?.name].some((value) => String(value || '').toLowerCase().includes(normalizedSearch)));
 
   return (
     <div className="p-5 max-w-[1080px] mx-auto">
-      {tab !== 'analytics' && (
+      {isDirectoryTab && (
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div className="text-[13.5px] text-muted">
             {count} {countWord}
@@ -116,7 +134,14 @@ export default function AdminPage() {
         </div>
       )}
 
-      <Tabs items={tabs} value={tab} onChange={setTab} />
+      <Tabs items={tabs} value={tab} onChange={(value) => { setTab(value); setSearch(''); }} />
+
+      {isDirectoryTab && count > 0 && (
+        <label className="relative mb-4 block max-w-[440px]">
+          <Icon name="search" size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === 'users' ? 'Найти аккаунт, роль или точку' : tab === 'stores' ? 'Найти торговую точку' : 'Найти сотрудника'} className="h-12 w-full rounded-xl border border-line bg-surface pl-11 pr-4 text-sm text-text outline-none transition-colors focus:border-green" />
+        </label>
+      )}
 
       {tab === 'users' && (
         <div className="mb-4 flex items-start gap-3 rounded-2xl border border-green bg-green-tint p-4">
@@ -138,21 +163,27 @@ export default function AdminPage() {
         </div>
       )}
 
-      {tab === 'analytics' ? (
+      {tab === 'overview' ? (
+        <AdminOverview onNavigate={setTab} />
+      ) : tab === 'flags' ? (
+        <FeatureFlagsPanel />
+      ) : tab === 'audit' ? (
+        <AuditPanel />
+      ) : tab === 'analytics' ? (
         <AdminAnalytics />
       ) : loading ? (
         <div className="grid place-items-center py-16">
           <Spinner />
         </div>
-      ) : count === 0 ? (
+      ) : count === 0 || (normalizedSearch && ((tab === 'users' && filteredUsers.length === 0) || (tab === 'stores' && filteredStores.length === 0) || (tab === 'employees' && filteredEmployees.length === 0))) ? (
         <EmptyState
           icon={tab === 'users' ? 'users' : tab === 'stores' ? 'store' : 'user'}
-          title={tab === 'users' ? t.empty_users : tab === 'stores' ? t.empty_stores : t.empty_emps}
+          title={normalizedSearch ? 'Ничего не найдено' : tab === 'users' ? t.empty_users : tab === 'stores' ? t.empty_stores : t.empty_emps}
         />
       ) : (
         <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))' }}>
           {tab === 'users' &&
-            users.map((u) => (
+            filteredUsers.map((u) => (
               <Row
                 key={u.id}
                 active={u.is_active}
@@ -165,7 +196,7 @@ export default function AdminPage() {
               />
             ))}
           {tab === 'stores' &&
-            stores.map((s) => (
+            filteredStores.map((s) => (
               <Row
                 key={s.id}
                 active={s.is_active}
@@ -173,11 +204,11 @@ export default function AdminPage() {
                 title={s.name}
                 sub={s.address || s.iiko_store_id || '—'}
                 onEdit={() => setSheet({ mode: 'edit', entity: s })}
-                onDeactivate={() => onDeactivate('stores', s.id)}
+                onDeactivate={s.is_active ? () => onDeactivate('stores', s.id) : null}
               />
             ))}
           {tab === 'employees' &&
-            employees.map((e) => (
+            filteredEmployees.map((e) => (
               <Row
                 key={e.id}
                 active={e.is_active}
@@ -185,7 +216,7 @@ export default function AdminPage() {
                 title={e.full_name}
                 sub={[e.position, stores.find((s) => s.id === e.store_id)?.name].filter(Boolean).join(' · ') || '—'}
                 onEdit={() => setSheet({ mode: 'edit', entity: e })}
-                onDeactivate={() => onDeactivate('employees', e.id)}
+                onDeactivate={e.is_active ? () => onDeactivate('employees', e.id) : null}
               />
             ))}
         </div>
@@ -204,6 +235,14 @@ export default function AdminPage() {
             reload();
           }}
         />
+      )}
+      {pendingDeactivate && (
+        <BottomSheet open onClose={() => setPendingDeactivate(null)}>
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-orange-tint text-orange"><Icon name="alertTriangle" size={23} /></div>
+          <h3 className="mt-4 text-center font-head text-[21px] font-semibold text-text">Отключить запись?</h3>
+          <p className="mt-2 text-center text-[12.5px] leading-relaxed text-muted">Запись останется в истории и её можно будет снова активировать через редактирование.</p>
+          <div className="mt-5 flex gap-3"><button type="button" onClick={() => setPendingDeactivate(null)} className="h-12 flex-1 rounded-xl border border-line bg-surface text-sm font-bold text-text">Отмена</button><button type="button" onClick={confirmDeactivate} className="h-12 flex-[1.2] rounded-xl bg-orange text-sm font-bold text-white">Отключить</button></div>
+        </BottomSheet>
       )}
     </div>
   );
@@ -228,11 +267,11 @@ function Row({ active, avatar, icon, title, sub, badge, onEdit, onDeactivate }) 
         </span>
       )}
       <div className="flex gap-1.5">
-        <button onClick={onEdit} className="w-9 h-9 grid place-items-center rounded-lg border border-line bg-surface text-muted cursor-pointer hover:text-green hover:border-green transition" aria-label="edit">
+        <button onClick={onEdit} className="w-11 h-11 grid place-items-center rounded-xl border border-line bg-surface text-muted cursor-pointer hover:text-green hover:border-green transition" aria-label="Редактировать">
           <Icon name="edit" size={17} />
         </button>
         {onDeactivate && (
-          <button onClick={onDeactivate} className="w-9 h-9 grid place-items-center rounded-lg border border-line bg-surface text-muted cursor-pointer hover:text-red hover:border-red transition" aria-label="deactivate">
+          <button onClick={onDeactivate} className="w-11 h-11 grid place-items-center rounded-xl border border-line bg-surface text-muted cursor-pointer hover:text-red hover:border-red transition" aria-label="Деактивировать">
             <Icon name="trash" size={17} />
           </button>
         )}
@@ -263,6 +302,7 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
         email: entity?.email || '',
         phone: entity?.phone || '',
         supervised_store_ids: entity?.supervised_store_ids || [],
+        scope_store_ids: entity?.store_scopes?.map((item) => item.store_id) || entity?.supervised_store_ids || [],
         is_active: entity ? entity.is_active : true,
       };
     if (tab === 'stores')
@@ -314,12 +354,20 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
           employee_id: form.role === ROLE_SENDER && form.employee_id !== '' ? Number(form.employee_id) : null,
           email: form.email || undefined,
           phone: form.phone || undefined,
-          supervised_store_ids: form.role === ROLE_REVIEWER ? form.supervised_store_ids : [],
+          supervised_store_ids: form.role === ROLE_REVIEWER ? form.scope_store_ids : [],
           is_active: form.is_active,
         };
         if (form.password) payload.password = form.password;
-        if (isEdit) await adminApi.updateUser(entity.id, payload);
-        else await adminApi.createUser({ ...payload, username: form.username, password: form.password });
+        const result = isEdit
+          ? await adminApi.updateUser(entity.id, payload)
+          : await adminApi.createUser({ ...payload, username: form.username, password: form.password });
+        const scopeByRole = { [ROLE_SENDER]: 'employee', [ROLE_MANAGER]: 'manager', [ROLE_REVIEWER]: 'supervisor' };
+        const scope = scopeByRole[form.role];
+        const scopeStoreIds = [...new Set([
+          ...form.scope_store_ids,
+          ...([ROLE_SENDER, ROLE_MANAGER].includes(form.role) && storeId ? [storeId] : []),
+        ])];
+        await adminApi.replaceUserScopes(result.user.id, scope ? scopeStoreIds.map((storeIdValue) => ({ store_id: storeIdValue, scope })) : []);
       } else if (tab === 'stores') {
         const payload = { name: form.name, address: form.address, iiko_store_id: form.iiko_store_id };
         if (isEdit) await adminApi.updateStore(entity.id, { ...payload, is_active: form.is_active });
@@ -403,16 +451,14 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
                 ))}
               </Select>
             )}
-            {form.role === ROLE_REVIEWER && (
-              <div className="flex flex-col gap-2">
-                <span className="text-[12px] font-semibold text-muted">Точки супервайзера</span>
-                <div className="flex flex-wrap gap-2">
-                  {stores.map((s) => {
-                    const selected = form.supervised_store_ids.includes(s.id);
-                    return <button key={s.id} type="button" onClick={() => setForm((f) => ({ ...f, supervised_store_ids: selected ? f.supervised_store_ids.filter((id) => id !== s.id) : [...f.supervised_store_ids, s.id] }))} className="px-3 py-2 rounded-xl text-[12px] font-semibold border" style={{ background: selected ? 'var(--green-tint)' : 'var(--surface)', borderColor: selected ? 'var(--green)' : 'var(--line)', color: selected ? 'var(--green)' : 'var(--text)' }}>{s.name}</button>;
-                  })}
-                </div>
-              </div>
+            {[ROLE_SENDER, ROLE_MANAGER, ROLE_REVIEWER].includes(form.role) && (
+              <StoreScopePicker
+                stores={stores}
+                value={form.scope_store_ids}
+                primaryStoreId={form.store_id ? Number(form.store_id) : null}
+                role={form.role}
+                onChange={(scopeStoreIds) => setForm((current) => ({ ...current, scope_store_ids: scopeStoreIds }))}
+              />
             )}
             <Field label={t.f_email} value={form.email} onChange={set('email')} />
             <Field label={t.f_phone} value={form.phone} onChange={set('phone')} />
@@ -522,6 +568,30 @@ function ActiveToggle({ label, checked, onChange }) {
       />
       <span className="text-sm text-text">{label}</span>
     </label>
+  );
+}
+
+function StoreScopePicker({ stores, value, primaryStoreId, role, onChange }) {
+  const label = role === ROLE_REVIEWER ? 'Доступ к точкам платформы' : 'Дополнительный доступ к точкам';
+  const available = stores.filter((store) => store.is_active && store.id !== primaryStoreId);
+  return (
+    <fieldset className="rounded-2xl border border-line p-3">
+      <legend className="px-1 text-[12.5px] font-semibold text-text">{label}</legend>
+      <p className="mb-3 text-[11.5px] leading-relaxed text-muted">Основная точка доступна по роли автоматически. Здесь можно выдать доступ к другим точкам.</p>
+      {available.length === 0 ? <div className="text-[12px] text-faint">Других активных точек нет</div> : (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {available.map((store) => {
+            const selected = value.includes(store.id);
+            return (
+              <label key={store.id} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 text-[12px] font-semibold transition-colors ${selected ? 'border-green bg-green-tint text-green' : 'border-line bg-surface text-text'}`}>
+                <input type="checkbox" checked={selected} onChange={() => onChange(selected ? value.filter((id) => id !== store.id) : [...value, store.id])} className="h-4 w-4 accent-[var(--green)]" />
+                <span className="truncate">{store.name}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </fieldset>
   );
 }
 
