@@ -14,6 +14,7 @@ import BiometricScanOverlay from '../../components/biometric/BiometricScanOverla
 const DEMO = {
   sender: { identifier: 'sender1', password: 'sender123' },
   manager: { identifier: 'manager', password: 'manager123' },
+  hr: { identifier: 'hr', password: 'hr123' },
   reviewer: { identifier: 'reviewer', password: 'reviewer123' },
   admin: { identifier: 'admin', password: 'admin12345' },
 };
@@ -191,7 +192,7 @@ export default function LoginPage() {
               <span className="flex-1 h-px bg-line" />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={() => submit(DEMO.sender)}
@@ -212,6 +213,13 @@ export default function LoginPage() {
                 className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
               >
                 {t.role_reviewer}
+              </button>
+              <button
+                type="button"
+                onClick={() => submit(DEMO.hr)}
+                className="h-11 border-[1.5px] border-line bg-surface rounded-xl text-text font-semibold text-[12.5px] cursor-pointer hover:border-green transition-colors"
+              >
+                {t.role_hr}
               </button>
               <button
                 type="button"

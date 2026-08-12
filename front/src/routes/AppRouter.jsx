@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import AppShell from '../components/layout/AppShell';
 import Spinner from '../components/ui/Spinner';
 import { RequireAuth, RequireRole, GuestOnly } from './guards';
-import { ROLE_SENDER, ROLE_REVIEWER, ROLE_ADMIN } from '../constants/roles';
+import { ROLE_SENDER, ROLE_REVIEWER, ROLE_HR, ROLE_ADMIN } from '../constants/roles';
 import { PLATFORM_ROUTES } from '../platform/platformConfig';
 
 import LoginPage from '../pages/auth/LoginPage';
@@ -27,6 +27,7 @@ const PlatformTasksPage = lazy(() => import('../platform/pages/PlatformTasksPage
 const PlatformApprovalsPage = lazy(() => import('../platform/pages/PlatformApprovalsPage'));
 const PlatformManagerPage = lazy(() => import('../platform/pages/PlatformManagerPage'));
 const PlatformReviewerPage = lazy(() => import('../platform/pages/PlatformReviewerPage'));
+const PlatformHrPage = lazy(() => import('../platform/pages/PlatformHrPage'));
 const PlatformProfilePage = lazy(() => import('../platform/pages/PlatformProfilePage'));
 const PlatformNotificationsPage = lazy(() => import('../platform/pages/PlatformNotificationsPage'));
 const PlatformSupportPage = lazy(() => import('../platform/pages/PlatformSupportPage'));
@@ -40,6 +41,7 @@ const PlatformComingSoonPage = lazy(() => import('../platform/pages/PlatformComi
 
 const sender = (el) => <RequireRole roles={[ROLE_SENDER]}>{el}</RequireRole>;
 const reviewer = (el) => <RequireRole roles={[ROLE_REVIEWER, ROLE_ADMIN]}>{el}</RequireRole>;
+const hr = (el) => <RequireRole roles={[ROLE_HR, ROLE_ADMIN]}>{el}</RequireRole>;
 const admin = (el) => <RequireRole roles={[ROLE_ADMIN]}>{el}</RequireRole>;
 const platformPage = (el) => (
   <Suspense fallback={<div className="grid min-h-[50dvh] place-items-center"><Spinner size={30} /></div>}>
@@ -75,6 +77,7 @@ export default function AppRouter() {
         <Route path="approvals" element={platformPage(<PlatformApprovalsPage />)} />
         <Route path="management" element={platformPage(<PlatformManagerPage />)} />
         <Route path="control" element={reviewer(platformPage(<PlatformReviewerPage />))} />
+        <Route path="hr" element={hr(platformPage(<PlatformHrPage />))} />
         <Route path="profile" element={platformPage(<PlatformProfilePage />)} />
         <Route path="notifications" element={platformPage(<PlatformNotificationsPage />)} />
         <Route path="support" element={platformPage(<PlatformSupportPage />)} />

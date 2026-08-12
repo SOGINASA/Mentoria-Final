@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 
 from models import db, User, Store, Employee, WriteOff, WriteOffPhoto, WriteOffItem, Notification
 from constants import (
-    ROLE_SENDER, ROLE_MANAGER, ROLE_REVIEWER, ROLE_ADMIN,
+    ROLE_SENDER, ROLE_MANAGER, ROLE_REVIEWER, ROLE_HR, ROLE_ADMIN,
     STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED,
     TYPE_NO_DEDUCTION, TYPE_WITH_DEDUCTION, SOURCE_MANUAL, SOURCE_AUTO_FALL,
     IIKO_SYNCED,
@@ -108,6 +108,10 @@ def seed_users(stores):
 
     _get_or_create_user(admin_username, admin_password, 'Администратор', ROLE_ADMIN)
     _get_or_create_user('reviewer', 'reviewer123', 'Проверяющий Главный', ROLE_REVIEWER)
+    hr_user = _get_or_create_user('hr', 'hr123', 'HR Специалист', ROLE_HR)
+    hr_user.role = ROLE_HR
+    hr_user.is_active = True
+    hr_user.set_password('hr123')
 
     store1 = stores[0] if len(stores) > 0 else None
     store2 = stores[1] if len(stores) > 1 else None
@@ -334,7 +338,7 @@ def seed_all():
     seed_write_offs(stores)
     seed_notifications(stores)
     print('[seed] Точки, сотрудники и демо-пользователи готовы.')
-    print('[seed] Логины: admin/admin12345, reviewer/reviewer123, manager/manager123, sender1/sender123, sender2/sender123')
+    print('[seed] Логины: admin/admin12345, reviewer/reviewer123, manager/manager123, hr/hr123, sender1/sender123, sender2/sender123')
 
 
 if __name__ == '__main__':

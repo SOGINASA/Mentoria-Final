@@ -44,6 +44,7 @@ function PlatformSidebar() {
   const { pathname } = useLocation();
   const user = useAuthStore((s) => s.user);
   const { p } = usePlatformCopy();
+  const legacyHome = LEGACY_HOME_ROUTE_BY_ROLE[user?.role];
 
   return (
     <aside className="hidden h-[100dvh] w-[272px] flex-none flex-col self-start overflow-y-auto overscroll-contain border-r border-line bg-surface px-4 py-5 lg:sticky lg:top-0 lg:flex">
@@ -84,14 +85,14 @@ function PlatformSidebar() {
       </nav>
 
       <div className="flex-1" />
-      <button
+      {legacyHome && <button
         type="button"
-        onClick={() => navigate(LEGACY_HOME_ROUTE_BY_ROLE[user?.role] || '/')}
+        onClick={() => navigate(legacyHome)}
         className="mb-3 flex min-h-12 items-center gap-3 rounded-2xl border border-line bg-surface2 px-3.5 text-left text-[13px] font-semibold text-muted transition-colors hover:border-green hover:text-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"
       >
         <Icon name="arrowSwap" size={19} />
         <span>{p.old_system}</span>
-      </button>
+      </button>}
       <NavLink
         to={PLATFORM_ROUTES.profile}
         className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 transition-colors hover:bg-surface2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green"

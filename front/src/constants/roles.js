@@ -12,7 +12,7 @@ export const HOME_ROUTE_BY_ROLE = {
   [ROLE_SENDER]: '/',
   [ROLE_REVIEWER]: '/app/control',
   [ROLE_MANAGER]: '/app',
-  [ROLE_HR]: '/app',
+  [ROLE_HR]: '/app/hr',
   [ROLE_FINANCE]: '/app',
   [ROLE_OPERATIONS]: '/app',
   [ROLE_ADMIN]: '/admin',
@@ -21,9 +21,5 @@ export const HOME_ROUTE_BY_ROLE = {
 export const LEGACY_HOME_ROUTE_BY_ROLE = {
   [ROLE_SENDER]: '/',
   [ROLE_REVIEWER]: '/review',
-  [ROLE_MANAGER]: '/app',
-  [ROLE_HR]: '/app',
-  [ROLE_FINANCE]: '/app',
-  [ROLE_OPERATIONS]: '/app',
   [ROLE_ADMIN]: '/admin',
 };

@@ -14,10 +14,11 @@ from routes.news import news_bp
 from routes.manager import manager_bp
 from routes.admin_platform import admin_platform_bp
 from routes.employee_services import employee_services_bp
+from routes.hr import hr_bp
 
 __all__ = [
     'auth_bp', 'stores_bp', 'writeoffs_bp', 'uploads_bp', 'admin_bp',
     'notifications_bp', 'webauthn_bp', 'platform_bp', 'shifts_bp',
     'time_tracking_bp', 'tasks_bp', 'cases_bp', 'news_bp', 'manager_bp',
-    'admin_platform_bp', 'employee_services_bp',
+    'admin_platform_bp', 'employee_services_bp', 'hr_bp',
 ]
