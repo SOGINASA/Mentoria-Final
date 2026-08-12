@@ -6,7 +6,7 @@ import Toast from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/authStore';
 import { useNotifyStore } from '../../store/notifyStore';
 import { initials } from '../../utils/format';
-import { LEGACY_HOME_ROUTE_BY_ROLE } from '../../constants/roles';
+import { LEGACY_HOME_ROUTE_BY_ROLE, ROLE_ADMIN } from '../../constants/roles';
 import {
   flushManagerMutations,
   getManagerQueueSnapshot,
