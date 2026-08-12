@@ -3,6 +3,8 @@ export const PLATFORM_ROUTES = Object.freeze({
   shifts: '/app/shifts',
   income: '/app/income',
   tasks: '/app/tasks',
+  approvals: '/app/approvals',
+  management: '/app/management',
   profile: '/app/profile',
   notifications: '/app/notifications',
   support: '/app/support',
@@ -53,9 +55,21 @@ export function getPlatformBackRoute(pathname) {
   return PLATFORM_ROUTES.home;
 }
 
-export function createPlatformNavigation(copy, pendingTaskCount = 0) {
+export function canManageApprovals(permissions = []) {
+  return permissions.includes('*') || permissions.some((permission) => [
+    'manager.queue', 'employee_services.manage', 'time.manage', 'tasks.manage', 'shifts.manage',
+  ].includes(permission));
+}
+
+export function canManageWorkspace(permissions = []) {
+  return permissions.includes('*') || permissions.includes('manager.queue');
+}
+
+export function createPlatformNavigation(copy, pendingTaskCount = 0, permissions = []) {
   return [
     { to: PLATFORM_ROUTES.home, end: true, icon: 'home', label: copy.today },
+    ...(canManageWorkspace(permissions) ? [{ to: PLATFORM_ROUTES.management, icon: 'briefcase', label: copy.management }] : []),
+    ...(canManageApprovals(permissions) ? [{ to: PLATFORM_ROUTES.approvals, icon: 'queue', label: copy.approvals }] : []),
     { to: PLATFORM_ROUTES.shifts, icon: 'calendar', label: copy.shifts },
     { to: PLATFORM_ROUTES.income, icon: 'wallet', label: copy.income },
     {
@@ -71,6 +85,13 @@ export function createPlatformNavigation(copy, pendingTaskCount = 0) {
       activeRoutes: EMPLOYEE_SERVICE_ROUTES,
     },
   ];
+}
+
+export function createPlatformMobileNavigation(copy, pendingTaskCount = 0, permissions = []) {
+  const navigation = createPlatformNavigation(copy, pendingTaskCount, permissions);
+  return canManageWorkspace(permissions)
+    ? navigation.filter((item) => ![PLATFORM_ROUTES.shifts, PLATFORM_ROUTES.tasks].includes(item.to))
+    : navigation;
 }
 
 export function createEmployeeServiceNavigation(copy) {
@@ -96,6 +117,8 @@ export function getPlatformRouteTitle(pathname, copy) {
     [PLATFORM_ROUTES.shifts]: copy.shifts,
     [PLATFORM_ROUTES.income]: copy.income,
     [PLATFORM_ROUTES.tasks]: copy.tasks,
+    [PLATFORM_ROUTES.approvals]: copy.approvals,
+    [PLATFORM_ROUTES.management]: copy.management,
     [PLATFORM_ROUTES.profile]: copy.profile,
     [PLATFORM_ROUTES.notifications]: copy.notifications,
     [PLATFORM_ROUTES.support]: copy.support,

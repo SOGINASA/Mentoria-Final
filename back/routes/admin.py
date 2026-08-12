@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify
 from models import db, User, Store, Employee
 from utils.auth_helpers import role_required
 from utils.validators import validate_username, validate_email
-from constants import ROLE_ADMIN, ROLE_REVIEWER, ROLE_SENDER, ROLES
+from constants import ROLE_ADMIN, ROLE_MANAGER, ROLE_REVIEWER, ROLE_SENDER, ROLES
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -52,6 +52,8 @@ def create_user():
     store_id = data.get('store_id')
     if store_id and not Store.query.get(store_id):
         return jsonify({'error': 'Точка не найдена'}), 400
+    if role in (ROLE_SENDER, ROLE_MANAGER) and not store_id:
+        return jsonify({'error': 'Для сотрудника и менеджера торговая точка обязательна'}), 400
     employee_id = data.get('employee_id')
     if role != ROLE_SENDER:
         employee_id = None
@@ -113,6 +115,8 @@ def update_user(user_id):
         if data['store_id'] and not Store.query.get(data['store_id']):
             return jsonify({'error': 'Точка не найдена'}), 400
         user.store_id = data['store_id']
+    if user.role in (ROLE_SENDER, ROLE_MANAGER) and not user.store_id:
+        return jsonify({'error': 'Для сотрудника и менеджера торговая точка обязательна'}), 400
     if 'employee_id' in data:
         employee = Employee.query.get(data['employee_id']) if data['employee_id'] else None
         if data['employee_id'] and not employee:

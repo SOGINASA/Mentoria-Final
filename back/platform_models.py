@@ -340,11 +340,15 @@ class SupportCase(db.Model):
 
     messages = db.relationship('CaseMessage', backref='case', cascade='all, delete-orphan',
                                lazy='selectin', order_by='CaseMessage.created_at')
+    author = db.relationship('User', foreign_keys=[author_id], lazy='joined')
+    assignee = db.relationship('User', foreign_keys=[assigned_to_id], lazy='joined')
 
     def to_dict(self):
         return {'id': self.id, 'reference': self.reference, 'author_id': self.author_id,
+                'author_name': self.author.full_name if self.author else None,
                 'store_id': self.store_id, 'category': self.category, 'subject': self.subject,
                 'status': self.status, 'priority': self.priority, 'assigned_to_id': self.assigned_to_id,
+                'assigned_to_name': self.assignee.full_name if self.assignee else None,
                 'messages': [m.to_dict() for m in self.messages],
                 'created_at': _utc_iso(self.created_at), 'updated_at': _utc_iso(self.updated_at)}
 

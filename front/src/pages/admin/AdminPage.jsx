@@ -90,9 +90,9 @@ export default function AdminPage() {
 
   const tabs = [
     { key: 'analytics', label: t.nav_analytics },
-    { key: 'users', label: t.admin_users },
+    { key: 'users', label: 'Аккаунты и роли' },
     { key: 'stores', label: t.admin_stores },
-    { key: 'employees', label: t.admin_employees },
+    { key: 'employees', label: 'Справочник iiko' },
   ];
 
   const addLabel = tab === 'users' ? t.admin_add_user : tab === 'stores' ? t.admin_add_store : t.admin_add_emp;
@@ -117,6 +117,26 @@ export default function AdminPage() {
       )}
 
       <Tabs items={tabs} value={tab} onChange={setTab} />
+
+      {tab === 'users' && (
+        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-green bg-green-tint p-4">
+          <Icon name="shieldCheck" size={20} className="mt-0.5 flex-none text-green" />
+          <div>
+            <div className="text-[13px] font-bold text-text">Здесь создаются аккаунты для входа</div>
+            <div className="mt-1 text-[12px] leading-relaxed text-muted">Укажите логин, временный пароль, роль и торговую точку. Для менеджера точка обязательна.</div>
+          </div>
+        </div>
+      )}
+      {tab === 'employees' && (
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-orange bg-orange-tint p-4 sm:flex-row sm:items-center">
+          <Icon name="info" size={20} className="flex-none text-orange" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-bold text-text">Это справочник сотрудников iiko, а не аккаунты</div>
+            <div className="mt-1 text-[12px] leading-relaxed text-muted">Такая запись используется в списаниях и не может войти в Staff Platform.</div>
+          </div>
+          <button type="button" onClick={() => setTab('users')} className="min-h-11 flex-none rounded-xl border border-orange bg-surface px-4 text-[12px] font-bold text-orange transition-colors hover:bg-orange-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange">Создать аккаунт</button>
+        </div>
+      )}
 
       {tab === 'analytics' ? (
         <AdminAnalytics />
@@ -228,6 +248,8 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
   const isEdit = mode === 'edit';
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const [form, setForm] = useState(() => {
     if (tab === 'users')
@@ -259,7 +281,21 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
     };
   });
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+    setFieldErrors((current) => ({ ...current, [k]: null }));
+  };
+
+  function validateUser() {
+    const errors = {};
+    if (!form.full_name.trim()) errors.full_name = 'Укажите ФИО';
+    if (!isEdit && !/^[A-Za-z0-9._-]{3,30}$/.test(form.username.trim())) errors.username = '3–30 символов: латиница, цифры, точка, _ или -';
+    if (!isEdit && form.password.length < 6) errors.password = 'Минимум 6 символов';
+    if (isEdit && form.password && form.password.length < 6) errors.password = 'Минимум 6 символов';
+    if ([ROLE_SENDER, ROLE_MANAGER].includes(form.role) && !form.store_id) errors.store_id = 'Для сотрудника и менеджера выберите торговую точку';
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
 
   async function save() {
     setSaving(true);
@@ -267,6 +303,10 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
     try {
       const storeId = form.store_id === '' ? null : Number(form.store_id);
       if (tab === 'users') {
+        if (!validateUser()) {
+          setSaving(false);
+          return;
+        }
         const payload = {
           full_name: form.full_name,
           role: form.role,
@@ -316,8 +356,9 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
       ? t.admin_edit_emp
       : t.admin_add_emp;
 
+  const storeRequired = tab === 'users' && [ROLE_SENDER, ROLE_MANAGER].includes(form.role);
   const storeOptions = (
-    <Select label={tab === 'users' ? t.f_store_opt : t.f_store_opt} value={form.store_id} onChange={set('store_id')}>
+    <Select label={storeRequired ? 'Торговая точка *' : t.f_store_opt} value={form.store_id} onChange={set('store_id')} error={fieldErrors.store_id}>
       <option value="">{t.no_store}</option>
       {stores.map((s) => (
         <option key={s.id} value={s.id}>
@@ -339,14 +380,18 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
       <div className="flex flex-col gap-3 max-h-[60vh] overflow-auto pr-0.5">
         {tab === 'users' && (
           <>
-            <Field label={t.f_fullname} value={form.full_name} onChange={set('full_name')} />
-            {!isEdit && <Field label={t.f_username} value={form.username} onChange={set('username')} />}
+            <div className="rounded-2xl bg-surface2 p-4 text-[12px] leading-relaxed text-muted"><strong className="text-text">Данные для входа.</strong> Передайте сотруднику логин и временный пароль безопасным способом. Пароль можно сменить позже.</div>
+            <Field label={`${t.f_fullname} *`} value={form.full_name} onChange={set('full_name')} error={fieldErrors.full_name} autoComplete="name" />
+            {!isEdit && <Field label={`${t.f_username} *`} value={form.username} onChange={set('username')} error={fieldErrors.username} hint="Например: manager.almaty01" autoComplete="off" />}
             <Field
-              label={t.f_password}
-              type="password"
+              label={`${t.f_password}${isEdit ? '' : ' *'}`}
+              type={showPassword ? 'text' : 'password'}
               value={form.password}
               onChange={set('password')}
-              hint={isEdit ? t.password_keep : undefined}
+              error={fieldErrors.password}
+              hint={isEdit ? t.password_keep : 'Минимум 6 символов. Это временный пароль для первого входа.'}
+              autoComplete="new-password"
+              action={<button type="button" onClick={() => setShowPassword((value) => !value)} className="min-h-11 rounded-xl px-3 text-[12px] font-bold text-green hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">{showPassword ? 'Скрыть' : 'Показать'}</button>}
             />
             <RoleChips value={form.role} onChange={(r) => setForm((f) => ({ ...f, role: r }))} t={t} />
             {storeOptions}
@@ -407,17 +452,22 @@ function AdminForm({ tab, mode, entity, stores, employees, onClose, onSaved }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', hint }) {
+function Field({ label, value, onChange, type = 'text', hint, error, action, ...props }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[12.5px] font-semibold text-text">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        className="h-12 bg-surface border-[1.5px] border-line rounded-xl px-3.5 outline-none text-[15px] text-text focus:border-green transition-colors"
-      />
-      {hint && <span className="text-[11.5px] text-faint">{hint}</span>}
+      <span className="flex gap-2">
+        <input
+          type={type}
+          value={value}
+          onChange={onChange}
+          aria-invalid={Boolean(error)}
+          className={`h-12 min-w-0 flex-1 bg-surface border-[1.5px] rounded-xl px-3.5 outline-none text-[15px] text-text focus:border-green transition-colors ${error ? 'border-red' : 'border-line'}`}
+          {...props}
+        />
+        {action}
+      </span>
+      {(error || hint) && <span role={error ? 'alert' : undefined} className={`text-[11.5px] ${error ? 'text-red' : 'text-faint'}`}>{error || hint}</span>}
     </label>
   );
 }
@@ -475,17 +525,19 @@ function ActiveToggle({ label, checked, onChange }) {
   );
 }
 
-function Select({ label, value, onChange, children }) {
+function Select({ label, value, onChange, children, error }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[12.5px] font-semibold text-text">{label}</span>
       <select
         value={value}
         onChange={onChange}
-        className="h-12 bg-surface border-[1.5px] border-line rounded-xl px-3 outline-none text-[15px] text-text focus:border-green transition-colors cursor-pointer"
+        aria-invalid={Boolean(error)}
+        className={`h-12 bg-surface border-[1.5px] rounded-xl px-3 outline-none text-[15px] text-text focus:border-green transition-colors cursor-pointer ${error ? 'border-red' : 'border-line'}`}
       >
         {children}
       </select>
+      {error && <span role="alert" className="text-[11.5px] text-red">{error}</span>}
     </label>
   );
 }

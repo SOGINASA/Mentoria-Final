@@ -160,6 +160,81 @@ def create_task():
     return jsonify({'task': item.to_dict()}), 201
 
 
+@tasks_bp.patch('/manager/<int:task_id>')
+@permission_required('tasks.manage')
+def update_managed_task(task_id):
+    manager = get_current_user()
+    item = PlatformTask.query.get_or_404(task_id)
+    if not can_access_store(manager, item.store_id, 'tasks.manage'):
+        return jsonify({'error': 'Нет доступа к точке'}), 403
+    if item.status in ('approved', 'cancelled', 'completed'):
+        return jsonify({'error': 'Задачу нельзя редактировать в текущем состоянии'}), 409
+    data = request.get_json(silent=True) or {}
+    try:
+        expected_version(data, item.version)
+        due_at = parse_datetime(data.get('due_at'), 'due_at') if 'due_at' in data else item.due_at
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({'error': str(exc)}), 409 if isinstance(exc, RuntimeError) else 400
+    title = str(data.get('title', item.title) or '').strip()
+    if not title:
+        return jsonify({'error': 'Название обязательно'}), 400
+    assignee_id = data.get('assignee_id', item.assignee_id)
+    assignee = User.query.get(assignee_id) if assignee_id else None
+    if assignee_id and (not assignee or not can_access_store(assignee, item.store_id)):
+        return jsonify({'error': 'Исполнитель недоступен для этой точки'}), 400
+    previous_assignee_id = item.assignee_id
+    item.title = title
+    item.description = data.get('description', item.description)
+    item.task_type = data.get('task_type', item.task_type)
+    item.assignee_id = assignee_id
+    item.due_at = due_at
+    if 'steps' in data:
+        if any(step.is_done for step in item.step_results):
+            return jsonify({'error': 'Нельзя менять чек-лист после начала выполнения'}), 409
+        item.step_results.clear()
+        for position, value in enumerate(data.get('steps') or []):
+            title_value = value.get('title') if isinstance(value, dict) else value
+            title_value = str(title_value or '').strip()
+            if title_value:
+                item.step_results.append(TaskStepResult(title=title_value, position=position))
+    item.version += 1
+    if item.assignee_id:
+        notify(item.assignee_id, 'task_updated',
+               'Задача назначена' if item.assignee_id != previous_assignee_id else 'Задача изменена',
+               body=item.title, entity_type='task', entity_id=item.id,
+               action_url='/app/tasks', commit=False)
+    audit(manager, 'task.updated', 'task', item.id, item.store_id,
+          {'previous_assignee_id': previous_assignee_id, 'assignee_id': item.assignee_id})
+    db.session.commit()
+    return jsonify({'task': item.to_dict()})
+
+
+@tasks_bp.delete('/manager/<int:task_id>')
+@permission_required('tasks.manage')
+def cancel_managed_task(task_id):
+    manager = get_current_user()
+    item = PlatformTask.query.get_or_404(task_id)
+    if not can_access_store(manager, item.store_id, 'tasks.manage'):
+        return jsonify({'error': 'Нет доступа к точке'}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        expected_version(data, item.version)
+    except RuntimeError as exc:
+        return jsonify({'error': str(exc)}), 409
+    if item.status in ('approved', 'cancelled'):
+        return jsonify({'error': 'Задачу нельзя удалить в текущем состоянии'}), 409
+    reason = str(data.get('reason') or '').strip()
+    item.status = 'cancelled'
+    item.version += 1
+    if item.assignee_id:
+        notify(item.assignee_id, 'task_cancelled', 'Задача отменена',
+               body=reason or item.title, entity_type='task', entity_id=item.id,
+               action_url='/app/tasks', commit=False)
+    audit(manager, 'task.cancelled', 'task', item.id, item.store_id, {'reason': reason})
+    db.session.commit()
+    return jsonify({'task': item.to_dict()})
+
+
 @tasks_bp.get('/manager')
 @permission_required('tasks.manage')
 def manager_tasks():

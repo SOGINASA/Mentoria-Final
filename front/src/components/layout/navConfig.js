@@ -15,6 +15,7 @@ export function useNavItems() {
     return [
       { to: '/admin', label: t.nav_admin, icon: 'sliders', match: ['/admin'] },
       { to: '/review', label: t.nav_queue, icon: 'queue', badge: pendingCount, match: ['/review'], exclude: ['/review/history'] },
+      { to: '/app', label: t.nav_platform, icon: 'grid', match: ['/app'] },
       { to: '/profile', label: t.nav_profile, icon: 'user', match: ['/profile'] },
     ];
   }
@@ -22,6 +23,7 @@ export function useNavItems() {
     return [
       { to: '/review', label: t.nav_queue, icon: 'queue', badge: pendingCount, match: ['/review'], exclude: ['/review/history'] },
       { to: '/review/history', label: t.nav_history, icon: 'history', match: ['/review/history'] },
+      { to: '/app', label: t.nav_platform, icon: 'grid', match: ['/app'] },
       { to: '/profile', label: t.nav_profile, icon: 'user', match: ['/profile'] },
     ];
   }
@@ -29,6 +31,7 @@ export function useNavItems() {
     { to: '/', label: t.nav_home, icon: 'home', match: ['/'], exact: true },
     { to: '/create', label: t.nav_create, icon: 'plus', match: ['/create'] },
     { to: '/my-requests', label: t.nav_my, icon: 'list', badge: draftCount, match: ['/my-requests'] },
+    { to: '/app', label: t.nav_platform, icon: 'grid', match: ['/app'] },
     { to: '/profile', label: t.nav_profile, icon: 'user', match: ['/profile'] },
   ];
 }

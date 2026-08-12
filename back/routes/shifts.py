@@ -179,9 +179,74 @@ def assign_shift(shift_id):
                                      assigned_by_id=manager.id)
         db.session.add(assignment)
     db.session.flush()
+    if shift.status == 'published':
+        notify(employee.id, 'shift_assigned', 'Назначена смена', body=shift.title,
+               entity_type='shift', entity_id=shift.id, action_url='/app/shifts', commit=False)
     audit(manager, 'shift.assigned', 'shift', shift.id, shift.store_id, {'user_id': employee.id})
     db.session.commit()
     return jsonify({'assignment': assignment.to_dict()}), 201
+
+
+@shifts_bp.delete('/manager/<int:shift_id>/assignments/<int:user_id>')
+@permission_required('shifts.manage')
+def remove_assignment(shift_id, user_id):
+    manager = get_current_user()
+    shift = Shift.query.get_or_404(shift_id)
+    if not can_access_store(manager, shift.store_id, 'shifts.manage'):
+        return jsonify({'error': 'Нет доступа к точке'}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        expected_version(data, shift.version)
+    except RuntimeError as exc:
+        return jsonify({'error': str(exc)}), 409
+    assignment = ShiftAssignment.query.filter_by(
+        shift_id=shift.id, user_id=user_id, status='confirmed',
+    ).first()
+    if not assignment:
+        return jsonify({'error': 'Активное назначение не найдено'}), 404
+    assignment.status = 'released'
+    shift.version += 1
+    notify(user_id, 'shift_unassigned', 'Назначение на смену снято', body=shift.title,
+           entity_type='shift', entity_id=shift.id, action_url='/app/shifts', commit=False)
+    audit(manager, 'shift.unassigned', 'shift', shift.id, shift.store_id,
+          {'user_id': user_id, 'reason': data.get('reason')})
+    db.session.commit()
+    return jsonify({'assignment': assignment.to_dict(), 'shift': shift.to_dict()})
+
+
+@shifts_bp.post('/manager/<int:shift_id>/cancel')
+@permission_required('shifts.manage')
+def cancel_shift(shift_id):
+    manager = get_current_user()
+    shift = Shift.query.get_or_404(shift_id)
+    if not can_access_store(manager, shift.store_id, 'shifts.manage'):
+        return jsonify({'error': 'Нет доступа к точке'}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        expected_version(data, shift.version)
+    except RuntimeError as exc:
+        return jsonify({'error': str(exc)}), 409
+    if shift.status == 'cancelled':
+        return jsonify({'error': 'Смена уже отменена'}), 409
+    reason = str(data.get('reason') or '').strip()
+    if shift.status == 'published' and len(reason) < 3:
+        return jsonify({'error': 'Укажите причину отмены опубликованной смены'}), 400
+    shift.status = 'cancelled'
+    shift.version += 1
+    for assignment in shift.assignments:
+        if assignment.status == 'confirmed':
+            notify(assignment.user_id, 'shift_cancelled', 'Смена отменена',
+                   body=reason or shift.title, entity_type='shift', entity_id=shift.id,
+                   action_url='/app/shifts', commit=False)
+    for item in ShiftRequest.query.filter_by(shift_id=shift.id, status='pending').all():
+        item.status = 'rejected'
+        item.decision_reason = reason or 'Смена отменена'
+        item.decided_by_id = manager.id
+        item.decided_at = utcnow()
+        item.version += 1
+    audit(manager, 'shift.cancelled', 'shift', shift.id, shift.store_id, {'reason': reason})
+    db.session.commit()
+    return jsonify({'shift': shift.to_dict()})
 
 
 @shifts_bp.post('/manager/<int:shift_id>/publish')

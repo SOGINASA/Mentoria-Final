@@ -6,7 +6,7 @@ from flask_jwt_extended import jwt_required
 from models import db
 from platform_models import NewsPost, NewsRead
 from services.audit import audit
-from services.permissions import has_permission
+from services.permissions import can_access_store, has_permission, scoped_store_ids
 from utils.auth_helpers import get_current_user
 from utils.platform_helpers import parse_datetime, utcnow
 
@@ -52,9 +52,15 @@ def create_news():
     status = data.get('status', 'draft')
     if status not in ('draft', 'published'):
         return jsonify({'error': 'Некорректный статус'}), 400
+    store_id = data.get('store_id')
+    allowed_store_ids = scoped_store_ids(user)
+    if allowed_store_ids is not None and not store_id:
+        return jsonify({'error': 'Для публикации выберите торговую точку'}), 400
+    if store_id and not can_access_store(user, int(store_id), 'news.manage'):
+        return jsonify({'error': 'Нет доступа к торговой точке'}), 403
     item = NewsPost(title=title, excerpt=data.get('excerpt'), body=body,
                     category=data.get('category'), audience_role=data.get('audience_role'),
-                    store_id=data.get('store_id'), status=status,
+                    store_id=store_id, status=status,
                     published_at=(parse_datetime(data.get('published_at'), 'published_at') or utcnow())
                     if status == 'published' else None, created_by_id=user.id)
     db.session.add(item)

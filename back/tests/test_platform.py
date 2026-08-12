@@ -57,6 +57,17 @@ def test_shift_publish_assignment_and_employee_list(client, store, sender, manag
     assert [item['id'] for item in response.get_json()['shifts']] == [shift['id']]
 
 
+def test_manager_workspace_returns_scoped_team_and_operational_data(client, store, sender, manager, auth):
+    shift = create_published_shift(client, auth, manager, store, sender)
+    response = client.get('/api/manager/workspace', headers=auth(manager))
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert [item['id'] for item in payload['stores']] == [store.id]
+    assert sender.id in [item['id'] for item in payload['team']]
+    assert shift['id'] in [item['id'] for item in payload['shifts']]
+
+
 def test_shift_assignment_rejects_overlap(client, store, sender, manager, auth):
     create_published_shift(client, auth, manager, store, sender, start=1, end=9)
     response = client.post('/api/shifts/manager', headers=auth(manager), json={
@@ -66,6 +77,24 @@ def test_shift_assignment_rejects_overlap(client, store, sender, manager, auth):
     response = client.post(f'/api/shifts/manager/{shift_id}/assignments',
                            headers=auth(manager), json={'user_id': sender.id})
     assert response.status_code == 409
+
+
+def test_manager_can_remove_assignment_and_cancel_shift(client, store, sender, manager, auth):
+    shift = create_published_shift(client, auth, manager, store, sender)
+    removed = client.delete(
+        f"/api/shifts/manager/{shift['id']}/assignments/{sender.id}",
+        headers=auth(manager), json={'version': shift['version'], 'reason': 'Замена состава'},
+    )
+    assert removed.status_code == 200
+    updated = removed.get_json()['shift']
+    assert updated['assignments'][0]['status'] == 'released'
+
+    cancelled = client.post(
+        f"/api/shifts/manager/{shift['id']}/cancel", headers=auth(manager),
+        json={'version': updated['version'], 'reason': 'Точка закрыта'},
+    )
+    assert cancelled.status_code == 200
+    assert cancelled.get_json()['shift']['status'] == 'cancelled'
 
 
 def test_open_shift_request_and_manager_decision(client, store, sender, manager, auth):
@@ -159,6 +188,26 @@ def test_task_checklist_completion_and_manager_review(client, store, sender, man
     assert reviewed.get_json()['task']['status'] == 'approved'
 
 
+def test_manager_can_edit_and_cancel_task(client, store, sender, manager, auth):
+    created = client.post('/api/tasks/manager', headers=auth(manager), json={
+        'store_id': store.id, 'title': 'Проверить склад', 'assignee_id': sender.id,
+        'due_at': iso(8), 'steps': ['Первый пункт'],
+    }).get_json()['task']
+    updated = client.patch(f"/api/tasks/manager/{created['id']}", headers=auth(manager), json={
+        'version': created['version'], 'title': 'Проверить холодильник',
+        'assignee_id': sender.id, 'steps': ['Температура', 'Журнал'],
+    })
+    assert updated.status_code == 200
+    task = updated.get_json()['task']
+    assert task['title'] == 'Проверить холодильник'
+    assert len(task['steps']) == 2
+
+    cancelled = client.delete(f"/api/tasks/manager/{task['id']}", headers=auth(manager),
+                              json={'version': task['version'], 'reason': 'Больше не требуется'})
+    assert cancelled.status_code == 200
+    assert cancelled.get_json()['task']['status'] == 'cancelled'
+
+
 def test_support_case_persists_messages(client, sender, auth):
     response = client.post('/api/cases', headers=auth(sender), json={
         'category': 'schedule', 'subject': 'Ошибка в графике',
@@ -171,6 +220,32 @@ def test_support_case_persists_messages(client, sender, auth):
                            json={'body': 'Дополнительная информация'})
     assert response.status_code == 201
     assert len(response.get_json()['case']['messages']) == 2
+
+
+def test_manager_support_news_and_analytics_are_store_scoped(client, store, sender, manager, auth):
+    case = client.post('/api/cases', headers=auth(sender), json={
+        'subject': 'Вопрос по графику', 'message': 'Нужно уточнить следующую смену',
+        'category': 'schedule',
+    }).get_json()['case']
+    cases = client.get('/api/cases', headers=auth(manager))
+    assert cases.status_code == 200
+    assert case['id'] in [item['id'] for item in cases.get_json()['cases']]
+    changed = client.patch(f"/api/cases/{case['id']}", headers=auth(manager),
+                           json={'status': 'in_progress', 'assigned_to_id': manager.id})
+    assert changed.status_code == 200
+
+    news = client.post('/api/news/manager', headers=auth(manager), json={
+        'title': 'Изменение графика', 'body': 'Проверьте расписание на следующую неделю.',
+        'excerpt': 'Обновлён график', 'category': 'Операции',
+        'store_id': store.id, 'status': 'published',
+    })
+    assert news.status_code == 201
+
+    analytics = client.get(f'/api/manager/analytics?days=7&store_id={store.id}',
+                           headers=auth(manager))
+    assert analytics.status_code == 200
+    assert analytics.get_json()['totals']['team'] >= 2
+    assert len(analytics.get_json()['series']) == 7
 
 
 def test_admin_can_manage_scopes_and_targeted_feature_flags(

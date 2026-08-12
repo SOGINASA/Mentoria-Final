@@ -1,5 +1,7 @@
 """Тесты аутентификации и ролей."""
 
+from constants import ROLE_MANAGER
+
 
 def test_login_success(client, sender):
     resp = client.post('/api/auth/login', json={'identifier': 'sender1', 'password': 'secret123'})
@@ -33,6 +35,27 @@ def test_admin_can_list_users(client, admin, auth):
     resp = client.get('/api/admin/users', headers=auth(admin))
     assert resp.status_code == 200
     assert 'users' in resp.get_json()
+
+
+def test_manager_account_requires_credentials_and_store(client, admin, store, auth):
+    missing_password = client.post('/api/admin/users', headers=auth(admin), json={
+        'username': 'manager.new', 'full_name': 'Новый менеджер',
+        'role': ROLE_MANAGER, 'store_id': store.id,
+    })
+    assert missing_password.status_code == 400
+
+    missing_store = client.post('/api/admin/users', headers=auth(admin), json={
+        'username': 'manager.new', 'password': 'secret123',
+        'full_name': 'Новый менеджер', 'role': ROLE_MANAGER,
+    })
+    assert missing_store.status_code == 400
+
+    created = client.post('/api/admin/users', headers=auth(admin), json={
+        'username': 'manager.new', 'password': 'secret123',
+        'full_name': 'Новый менеджер', 'role': ROLE_MANAGER, 'store_id': store.id,
+    })
+    assert created.status_code == 201
+    assert created.get_json()['user']['role'] == ROLE_MANAGER
 
 
 def test_change_password(client, sender, auth):

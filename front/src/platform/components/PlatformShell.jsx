@@ -11,6 +11,7 @@ import { usePlatformStore } from '../../store/platformStore';
 import { usePlatformCopy } from '../platformCopy';
 import {
   createEmployeeServiceNavigation,
+  createPlatformMobileNavigation,
   createPlatformNavigation,
   getPlatformBackRoute,
   getPlatformCompactRouteTitle,
@@ -26,7 +27,15 @@ function usePlatformNav() {
   const pendingTaskCount = usePlatformStore((state) => (
     state.tasks.filter((task) => !task.done).length
   ));
-  return createPlatformNavigation(p, pendingTaskCount);
+  const permissions = usePlatformStore((state) => state.permissions);
+  return createPlatformNavigation(p, pendingTaskCount, permissions);
+}
+
+function usePlatformMobileNav() {
+  const { p } = usePlatformCopy();
+  const pendingTaskCount = usePlatformStore((state) => state.tasks.filter((task) => !task.done).length);
+  const permissions = usePlatformStore((state) => state.permissions);
+  return createPlatformMobileNavigation(p, pendingTaskCount, permissions);
 }
 
 function PlatformSidebar() {
@@ -197,7 +206,7 @@ function PlatformSectionNav() {
 }
 
 function PlatformBottomNav() {
-  const nav = usePlatformNav();
+  const nav = usePlatformMobileNav();
   const { pathname } = useLocation();
   return (
     <nav aria-label="Platform navigation" className="fixed inset-x-0 bottom-0 z-30 grid h-[72px] grid-flow-col auto-cols-fr border-t border-line bg-surface/95 px-1 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md lg:hidden">
