@@ -71,6 +71,21 @@ describe('platformStore', () => {
     expect(timeApi.listTimecards).not.toHaveBeenCalled();
   });
 
+  test('starts an unscheduled shift using the account primary store fallback', async () => {
+    timeApi.createEvent.mockResolvedValue({
+      event: { id: 41, event_type: 'clock_in', store_id: 1 },
+      timecard: { id: 12, store_id: 1, status: 'open', worked_minutes: 0 },
+    });
+
+    await usePlatformStore.getState().toggleShift();
+
+    expect(timeApi.createEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event_type: 'clock_in', shift_id: undefined, store_id: undefined,
+    }), expect.any(String));
+    expect(usePlatformStore.getState().shiftActive).toBe(true);
+    expect(usePlatformStore.getState().timeState).toBe('clock_in');
+  });
+
   test('persists a support case returned by backend', async () => {
     casesApi.create.mockResolvedValue({
       case: { id: 7, reference: 'BH-S-000007', category: 'schedule' },

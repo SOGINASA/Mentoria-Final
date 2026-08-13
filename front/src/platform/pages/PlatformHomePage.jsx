@@ -88,7 +88,7 @@ export default function PlatformHomePage() {
                 <div className="mt-2 font-head text-[31px] font-semibold leading-none sm:text-[38px]">{shiftTime}</div>
               </div>
               <StatusPill tone={shiftActive ? 'orange' : 'green'}>
-                {shiftActive ? p.shift_started : (todayShift ? p.published : p.no_tasks)}
+                {shiftActive ? p.shift_started : (todayShift ? p.published : p.unscheduled_shift)}
               </StatusPill>
             </div>
 
@@ -112,13 +112,13 @@ export default function PlatformHomePage() {
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 text-[12px] font-medium text-white/75">
                 <Icon name="users" size={17} />
-                <span>{p.team_today}</span>
+                <span>{todayShift ? p.team_today : p.unscheduled_shift_hint}</span>
               </div>
               {featureEnabled('time_tracking') && <button
                 type="button"
                 onClick={toggleShift}
-                disabled={!todayShift && !shiftActive}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-[14px] font-bold text-green shadow-card-sm transition-colors hover:bg-green-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-green"
+                disabled={!user?.store_id && !shiftActive}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-[14px] font-bold text-green shadow-card-sm transition-colors hover:bg-green-tint disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-green"
               >
                 <Icon name={shiftActive ? 'stop' : 'play'} size={18} />
                 {shiftActive ? p.end_shift : p.start_shift}

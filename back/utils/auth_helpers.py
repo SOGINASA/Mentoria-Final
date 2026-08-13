@@ -3,7 +3,7 @@
 
 from functools import wraps
 
-from flask import jsonify
+from flask import jsonify, request
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
 
 from models import User
@@ -30,6 +30,12 @@ def role_required(*roles):
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
+            # Flask-JWT-Extended intentionally exempts CORS preflight requests
+            # from JWT verification. Do not attempt to read an identity after
+            # that exemption: the browser must receive the automatic OPTIONS
+            # response before it can send the authenticated request.
+            if request.method == 'OPTIONS':
+                return None
             verify_jwt_in_request()
             user = get_current_user()
             if not user or not user.is_active:
@@ -48,6 +54,8 @@ def permission_required(permission):
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
+            if request.method == 'OPTIONS':
+                return None
             verify_jwt_in_request()
             user = get_current_user()
             if not user or not user.is_active:
@@ -66,6 +74,8 @@ def feature_required(feature):
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
+            if request.method == 'OPTIONS':
+                return None
             verify_jwt_in_request()
             user = get_current_user()
             if not user or not user.is_active:
