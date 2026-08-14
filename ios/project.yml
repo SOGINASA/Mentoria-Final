@@ -43,8 +43,20 @@ targets:
         NSCameraUsageDescription: "Камера нужна, чтобы сфотографировать списываемую продукцию."
         NSPhotoLibraryUsageDescription: "Доступ к фото нужен, чтобы прикрепить снимок к заявке на списание."
         NSFaceIDUsageDescription: "Face ID используется для быстрого и безопасного входа в приложение."
-        # Dev-режим: разрешаем http к localhost / LAN / временному хосту.
-        # Для App Store ограничить (оставить только нужный домен с https).
+        NSMicrophoneUsageDescription: "Микрофон нужен для голосового ввода названия и описания товара."
+        NSSpeechRecognitionUsageDescription: "Распознавание речи позволяет заполнять поля голосом — удобно, когда руки заняты."
         NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
           NSAllowsLocalNetworking: true
+  BahandiUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: BahandiUITests
+    dependencies:
+      - target: Bahandi
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.itshechka.bahandi.uitests
+        TEST_TARGET_NAME: Bahandi
+        GENERATE_INFOPLIST_FILE: YES

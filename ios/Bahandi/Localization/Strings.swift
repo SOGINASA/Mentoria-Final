@@ -3,9 +3,9 @@ import Foundation
 // Двуязычные строки (RU/KZ). Доступ через AppSettings.t("key").
 enum Strings {
     static let ru: [String: String] = [
-        "app_name": "Списания",
+        "app_name": "Staff Platform",
         "login_title": "Вход в систему",
-        "login_sub": "Учёт списаний продукции Bahandi",
+        "login_sub": "Единая платформа сотрудников Bahandi",
         "login_login": "Логин",
         "login_pass": "Пароль",
         "login_ph_login": "Введите логин",
@@ -13,7 +13,11 @@ enum Strings {
         "login_demo": "демо-доступ",
         "login_error": "Неверный логин или пароль",
         "role_sender": "Отправитель",
+        "role_manager": "Менеджер",
         "role_reviewer": "Проверяющий",
+        "role_hr": "HR",
+        "role_finance": "Финансы",
+        "role_operations": "Операции",
         "role_admin": "Администратор",
         "greeting": "Здравствуйте,",
         "create_cta": "Создать списание",
@@ -179,9 +183,9 @@ enum Strings {
     ]
 
     static let kz: [String: String] = [
-        "app_name": "Есептен шығару",
+        "app_name": "Staff Platform",
         "login_title": "Жүйеге кіру",
-        "login_sub": "Bahandi өнімдерін есептен шығару",
+        "login_sub": "Bahandi қызметкерлерінің бірыңғай платформасы",
         "login_login": "Логин",
         "login_pass": "Құпиясөз",
         "login_ph_login": "Логинді енгізіңіз",
@@ -189,7 +193,11 @@ enum Strings {
         "login_demo": "демо-қолжетімділік",
         "login_error": "Логин немесе құпиясөз қате",
         "role_sender": "Жіберуші",
+        "role_manager": "Менеджер",
         "role_reviewer": "Тексеруші",
+        "role_hr": "HR",
+        "role_finance": "Қаржы",
+        "role_operations": "Операциялар",
         "role_admin": "Әкімші",
         "greeting": "Сәлеметсіз бе,",
         "create_cta": "Есептен шығару",

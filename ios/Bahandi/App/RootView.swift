@@ -11,14 +11,13 @@ struct RootView: View {
             case .guest:
                 LoginView()
             case .authed:
-                MainTabView()
+                StaffPlatformTabView()
             }
         }
-        .animation(.easeInOut, value: auth.status == .authed)
     }
 }
 
-struct MainTabView: View {
+struct LegacyMainTabView: View {
     @EnvironmentObject var auth: AuthStore
     @EnvironmentObject var settings: AppSettings
 

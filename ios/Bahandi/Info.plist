@@ -24,8 +24,6 @@
 	<string>1</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
@@ -35,10 +33,10 @@
 	<string>Face ID используется для быстрого и безопасного входа в приложение.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Микрофон нужен для голосового ввода названия и описания товара.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Распознавание речи позволяет заполнять поля голосом — удобно, когда руки заняты.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Доступ к фото нужен, чтобы прикрепить снимок к заявке на списание.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Распознавание речи позволяет заполнять поля голосом — удобно, когда руки заняты.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

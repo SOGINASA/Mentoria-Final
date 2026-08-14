@@ -33,11 +33,14 @@ struct AdminFormView: View {
     @State private var storeId: Int?
     @State private var employeeId: Int?
     @State private var email = ""
+    @State private var phone = ""
     @State private var address = ""
     @State private var iikoStoreId = ""
     @State private var position = ""
     @State private var isActive = true
     @State private var supervisedStoreIds: Set<Int> = []
+    @State private var scopeStoreIds: Set<Int> = []
+    @State private var iikoEmployeeId = ""
 
     @State private var saving = false
     @State private var error: String?
@@ -71,7 +74,18 @@ struct AdminFormView: View {
                                 }
                             }
                         }
+                        if [Role.sender, Role.manager].contains(role) {
+                            Section("Дополнительные точки доступа") {
+                                Text("Основная точка добавляется автоматически.").font(.caption).foregroundStyle(AppColor.muted)
+                                ForEach(stores) { store in
+                                    Toggle(store.name, isOn: Binding(get: { scopeStoreIds.contains(store.id) }, set: { enabled in
+                                        if enabled { scopeStoreIds.insert(store.id) } else { scopeStoreIds.remove(store.id) }
+                                    }))
+                                }
+                            }
+                        }
                         TextField(settings.t("f_email"), text: $email).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        TextField("Телефон", text: $phone).keyboardType(.phonePad)
                         if isEdit { Toggle(settings.t("admin_active"), isOn: $isActive) }
                     }
                 case .store:
@@ -79,12 +93,15 @@ struct AdminFormView: View {
                         TextField(settings.t("f_name"), text: $fullName)
                         TextField(settings.t("f_address"), text: $address)
                         TextField("iiko ID", text: $iikoStoreId)
+                        if isEdit { Toggle(settings.t("admin_active"), isOn: $isActive) }
                     }
                 case .employee:
                     Section {
                         TextField(settings.t("f_fullname"), text: $fullName)
                         TextField(settings.t("f_position"), text: $position)
+                        TextField("iiko ID сотрудника", text: $iikoEmployeeId)
                         storePicker
+                        if isEdit { Toggle(settings.t("admin_active"), isOn: $isActive) }
                     }
                 }
             }
@@ -105,9 +122,13 @@ struct AdminFormView: View {
     private var rolePicker: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(settings.t("f_role")).font(.system(size: 12.5, weight: .semibold)).foregroundColor(AppColor.muted)
-            HStack(spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96))], spacing: 8) {
                 roleChip(Role.sender, settings.t("role_sender"), AppColor.muted, AppColor.surface2)
+                roleChip(Role.manager, settings.t("role_manager"), AppColor.green, AppColor.greenTint)
                 roleChip(Role.reviewer, settings.t("role_reviewer"), AppColor.green, AppColor.greenTint)
+                roleChip(Role.hr, settings.t("role_hr"), AppColor.green, AppColor.greenTint)
+                roleChip(Role.finance, settings.t("role_finance"), AppColor.green, AppColor.greenTint)
+                roleChip(Role.operations, settings.t("role_operations"), AppColor.orange, AppColor.orangeTint)
                 roleChip(Role.admin, settings.t("role_admin"), AppColor.orange, AppColor.orangeTint)
             }
         }
@@ -155,11 +176,11 @@ struct AdminFormView: View {
     private func prefill() {
         switch config {
         case .editUser(let u):
-            fullName = u.fullName; role = u.role; storeId = u.storeId; employeeId = u.employeeId; email = u.email ?? ""; isActive = u.isActive ?? true; supervisedStoreIds = Set(u.supervisedStoreIds ?? [])
+            fullName = u.fullName; role = u.role; storeId = u.storeId; employeeId = u.employeeId; email = u.email ?? ""; phone = u.phone ?? ""; isActive = u.isActive ?? true; supervisedStoreIds = Set(u.supervisedStoreIds ?? []); scopeStoreIds = Set(u.storeScopes?.map(\.storeId) ?? [])
         case .editStore(let s):
-            fullName = s.name; address = s.address ?? ""; iikoStoreId = s.iikoStoreId ?? ""
+            fullName = s.name; address = s.address ?? ""; iikoStoreId = s.iikoStoreId ?? ""; isActive = s.isActive ?? true
         case .editEmployee(let e):
-            fullName = e.fullName; position = e.position ?? ""; storeId = e.storeId
+            fullName = e.fullName; position = e.position ?? ""; storeId = e.storeId; iikoEmployeeId = e.iikoEmployeeId ?? ""; isActive = e.isActive ?? true
         default: break
         }
     }
@@ -169,24 +190,34 @@ struct AdminFormView: View {
         do {
             switch config {
             case .newUser:
-                _ = try await APIClient.shared.adminCreateUser(["username": username, "password": password, "full_name": fullName, "role": role, "store_id": storeId, "employee_id": role == Role.sender ? employeeId : nil, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email])
+                let result = try await APIClient.shared.adminCreateUser(["username": username, "password": password, "full_name": fullName, "role": role, "store_id": storeId, "employee_id": role == Role.sender ? employeeId : nil, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email, "phone": phone.isEmpty ? nil : phone])
+                try await saveScopes(userID: result.user.id)
             case .editUser(let u):
-                var p: [String: Any?] = ["full_name": fullName, "role": role, "store_id": storeId, "employee_id": role == Role.sender ? employeeId : nil, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email, "is_active": isActive]
+                var p: [String: Any?] = ["full_name": fullName, "role": role, "store_id": storeId, "employee_id": role == Role.sender ? employeeId : nil, "supervised_store_ids": role == Role.reviewer ? Array(supervisedStoreIds) : [], "email": email.isEmpty ? nil : email, "phone": phone.isEmpty ? nil : phone, "is_active": isActive]
                 if !password.isEmpty { p["password"] = password }
                 _ = try await APIClient.shared.adminUpdateUser(u.id, p)
+                try await saveScopes(userID: u.id)
             case .newStore:
                 _ = try await APIClient.shared.adminCreateStore(["name": fullName, "address": address, "iiko_store_id": iikoStoreId])
             case .editStore(let s):
-                _ = try await APIClient.shared.adminUpdateStore(s.id, ["name": fullName, "address": address, "iiko_store_id": iikoStoreId])
+                _ = try await APIClient.shared.adminUpdateStore(s.id, ["name": fullName, "address": address, "iiko_store_id": iikoStoreId, "is_active": isActive])
             case .newEmployee:
-                _ = try await APIClient.shared.adminCreateEmployee(["full_name": fullName, "position": position, "store_id": storeId])
+                _ = try await APIClient.shared.adminCreateEmployee(["full_name": fullName, "position": position, "store_id": storeId, "iiko_employee_id": iikoEmployeeId])
             case .editEmployee(let e):
-                _ = try await APIClient.shared.adminUpdateEmployee(e.id, ["full_name": fullName, "position": position, "store_id": storeId])
+                _ = try await APIClient.shared.adminUpdateEmployee(e.id, ["full_name": fullName, "position": position, "store_id": storeId, "iiko_employee_id": iikoEmployeeId, "is_active": isActive])
             }
             settings.showToast(settings.t("save"))
             onSaved()
             dismiss()
         } catch { self.error = (error as? APIError)?.message ?? settings.t("error_generic") }
         saving = false
+    }
+
+    private func saveScopes(userID: Int) async throws {
+        let scope = role == Role.sender ? "employee" : role == Role.manager ? "manager" : role == Role.reviewer ? "supervisor" : nil
+        var ids = role == Role.reviewer ? supervisedStoreIds : scopeStoreIds
+        if [Role.sender, Role.manager].contains(role), let storeId { ids.insert(storeId) }
+        let values: [[String: Any]] = scope.map { value in ids.map { ["store_id": $0, "scope": value] } } ?? []
+        _ = try await APIClient.shared.adminReplaceScopes(userID, values)
     }
 }

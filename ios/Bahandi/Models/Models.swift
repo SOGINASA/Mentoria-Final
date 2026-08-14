@@ -38,6 +38,7 @@ struct Employee: Codable, Identifiable, Hashable {
     var position: String?
     var storeId: Int?
     var isActive: Bool?
+    var iikoEmployeeId: String?
 }
 
 struct UserRef: Codable, Hashable {
@@ -55,6 +56,7 @@ struct User: Codable, Identifiable, Hashable {
     let id: Int
     let username: String
     var email: String?
+    var phone: String?
     let fullName: String
     let role: String
     var storeId: Int?
@@ -63,6 +65,14 @@ struct User: Codable, Identifiable, Hashable {
     var employee: Employee?
     var supervisedStoreIds: [Int]?
     var isActive: Bool?
+    var storeScopes: [UserStoreScope]?
+}
+
+struct UserStoreScope: Codable, Identifiable, Hashable {
+    let id: Int
+    let storeId: Int
+    let scope: String
+    let store: Store?
 }
 
 struct WriteOff: Codable, Identifiable, Hashable {
@@ -94,6 +104,39 @@ struct Stats: Codable { let pending: Int; let approved: Int; let rejected: Int; 
     static let zero = Stats(pending: 0, approved: 0, rejected: 0, total: 0)
 }
 
+struct WriteOffAnalytics: Codable {
+    let totals: WriteOffAnalyticsTotals
+    let withHold: Int
+    let noHold: Int
+    let avgLoss: Int
+    let lossTotal: Int
+    let byStore: [WriteOffAnalyticsGroup]
+    let byEmployee: [WriteOffAnalyticsGroup]
+    let trend: [WriteOffAnalyticsPoint]
+}
+
+struct WriteOffAnalyticsTotals: Codable {
+    let total: Int
+    let pending: Int
+    let approved: Int
+    let rejected: Int
+}
+
+struct WriteOffAnalyticsGroup: Codable, Identifiable {
+    var id: String { "\(storeId ?? employeeId ?? 0)-\(name)" }
+    var storeId: Int?
+    var employeeId: Int?
+    let name: String
+    let count: Int
+    let loss: Int
+}
+
+struct WriteOffAnalyticsPoint: Codable, Identifiable {
+    var id: String { date }
+    let date: String
+    let count: Int
+}
+
 // Обёртки ответов API
 struct LoginResponse: Codable { let user: User; let accessToken: String; let refreshToken: String }
 struct MeResponse: Codable { let user: User }
@@ -119,3 +162,4 @@ struct UploadResponse: Codable { let url: String; let filename: String; var reco
 struct UserResponse: Codable { let user: User }
 struct StoreResponse: Codable { let store: Store }
 struct EmployeeResponse: Codable { let employee: Employee }
+struct ScopesResponse: Codable { let scopes: [UserStoreScope] }

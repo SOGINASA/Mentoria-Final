@@ -34,4 +34,11 @@ final class AuthStore: ObservableObject {
         user = nil
         status = .guest
     }
+
+    func updateProfile(email: String, phone: String) async throws {
+        let response: UserResponse = try await APIClient.shared.patch("platform/profile", body: [
+            "email": email, "phone": phone,
+        ])
+        user = response.user
+    }
 }

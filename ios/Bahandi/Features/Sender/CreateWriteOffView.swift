@@ -142,7 +142,9 @@ struct CreateWriteOffView: View {
     private var aiNeedsWriteoff: Bool { aiItems.contains { $0.requiresWriteoff } }
 
     private var photoStep: some View {
-        VStack(spacing: 14) {
+        let galleryTitle = settings.t("from_gallery")
+        let cameraTitle = settings.t("take_photo")
+        return VStack(spacing: 14) {
             let cols = [GridItem(.adaptive(minimum: 104), spacing: 11)]
             LazyVGrid(columns: cols, spacing: 11) {
                 ForEach(photos) { p in
@@ -159,7 +161,7 @@ struct CreateWriteOffView: View {
                     PhotosPicker(selection: $pickerItems, maxSelectionCount: maxPhotos - photos.count, matching: .images) {
                         VStack(spacing: 6) {
                             if uploading { ProgressView() } else { Image(systemName: "camera").font(.system(size: 24)) }
-                            Text(settings.t("from_gallery")).font(.system(size: 11.5, weight: .semibold))
+                            Text(galleryTitle).font(.system(size: 11.5, weight: .semibold))
                         }
                         .foregroundColor(AppColor.green).frame(width: 104, height: 104)
                         .background(AppColor.surface)
@@ -169,12 +171,12 @@ struct CreateWriteOffView: View {
             }
             HStack(spacing: 11) {
                 Button { showCamera = true } label: {
-                    Label(settings.t("take_photo"), systemImage: "camera.fill").font(.system(size: 14, weight: .semibold))
+                    Label(cameraTitle, systemImage: "camera.fill").font(.system(size: 14, weight: .semibold))
                         .frame(maxWidth: .infinity).frame(height: 50).foregroundColor(.white).background(AppColor.green)
                         .clipShape(RoundedRectangle(cornerRadius: 13))
                 }
                 PhotosPicker(selection: $pickerItems, maxSelectionCount: maxPhotos - photos.count, matching: .images) {
-                    Label(settings.t("from_gallery"), systemImage: "photo").font(.system(size: 14, weight: .semibold))
+                    Label(galleryTitle, systemImage: "photo").font(.system(size: 14, weight: .semibold))
                         .frame(maxWidth: .infinity).frame(height: 50).foregroundColor(AppColor.text).background(AppColor.surface)
                         .overlay(RoundedRectangle(cornerRadius: 13).stroke(AppColor.line, lineWidth: 1.5))
                         .clipShape(RoundedRectangle(cornerRadius: 13))

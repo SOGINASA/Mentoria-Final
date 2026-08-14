@@ -15,7 +15,11 @@ struct LoginView: View {
 
     private let demo: [(String, String, String)] = [
         ("role_sender", "sender1", "sender123"),
+        ("role_manager", "manager", "manager123"),
         ("role_reviewer", "reviewer", "reviewer123"),
+        ("role_hr", "hr", "hr123"),
+        ("role_finance", "finance", "finance123"),
+        ("role_operations", "operations", "operations123"),
         ("role_admin", "admin", "admin12345"),
     ]
 
@@ -57,7 +61,7 @@ struct LoginView: View {
                         .buttonStyle(.plain)
                         .padding(.top, 24)
 
-                        HStack(spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                             Rectangle().fill(AppColor.line).frame(height: 1)
                             Text(settings.lang == "kz" ? "немесе" : "или").font(.system(size: 11.5)).foregroundColor(AppColor.faint).fixedSize()
                             Rectangle().fill(AppColor.line).frame(height: 1)
@@ -84,6 +88,7 @@ struct LoginView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                         .disabled(loading)
+                        .accessibilityIdentifier("login.submit")
 
                         HStack(spacing: 8) {
                             Rectangle().fill(AppColor.line).frame(height: 1)
@@ -91,15 +96,16 @@ struct LoginView: View {
                             Rectangle().fill(AppColor.line).frame(height: 1)
                         }
 
-                        HStack(spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                             ForEach(demo, id: \.0) { item in
                                 Button { Task { await submit(item.1, item.2) } } label: {
                                     Text(settings.t(item.0)).font(.system(size: 12.5, weight: .semibold))
-                                        .frame(maxWidth: .infinity).frame(height: 44)
+                                        .frame(maxWidth: .infinity).frame(minHeight: 48)
                                         .foregroundColor(AppColor.text).background(AppColor.surface)
                                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppColor.line, lineWidth: 1.5))
                                         .clipShape(RoundedRectangle(cornerRadius: 12))
                                 }
+                                .accessibilityIdentifier("login.demo.\(item.1)")
                             }
                         }
                     }

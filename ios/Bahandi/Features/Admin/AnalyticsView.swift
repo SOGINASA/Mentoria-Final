@@ -24,6 +24,7 @@ struct AnalyticsView: View {
             }
         }
         .background(AppColor.bg)
+        .accessibilityIdentifier("platform.admin.analytics")
         .navigationTitle(settings.t("nav_analytics"))
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }

@@ -27,6 +27,7 @@ struct AdminView: View {
             }
         }
         .background(AppColor.bg)
+        .accessibilityIdentifier("platform.admin.directory")
         .navigationTitle(settings.t("nav_admin"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -75,17 +76,17 @@ struct AdminView: View {
         loading = true; defer { loading = false }
         switch tab {
         case "users": users = (try? await APIClient.shared.adminUsers().users) ?? []
-        case "stores": stores = (try? await APIClient.shared.stores().stores) ?? []
-        default: employees = (try? await APIClient.shared.employees().employees) ?? []
+        case "stores": stores = (try? await APIClient.shared.adminStores().stores) ?? []
+        default: employees = (try? await APIClient.shared.adminEmployees().employees) ?? []
         }
     }
     private func loadReferences() async {
-        stores = (try? await APIClient.shared.stores().stores) ?? []
-        employees = (try? await APIClient.shared.employees().employees) ?? []
+        stores = (try? await APIClient.shared.adminStores().stores) ?? []
+        employees = (try? await APIClient.shared.adminEmployees().employees) ?? []
     }
 
     private func roleLabel(_ r: String) -> String {
-        r == Role.reviewer ? settings.t("role_reviewer") : r == Role.admin ? settings.t("role_admin") : settings.t("role_sender")
+        roleTitle(r)
     }
     private func roleColor(_ r: String) -> (Color, Color) {
         r == Role.admin ? (AppColor.orange, AppColor.orangeTint)

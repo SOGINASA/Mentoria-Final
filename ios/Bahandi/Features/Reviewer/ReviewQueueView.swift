@@ -34,10 +34,11 @@ struct ReviewQueueView: View {
             }
         }
         .background(AppColor.bg)
+        .accessibilityIdentifier("platform.writeoffs.queue")
         .navigationTitle(settings.t("nav_queue"))
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadStats() }
-        .task(id: tab) { await store.loadList(status: WStatus.pending) }
+        .task(id: tab) { await store.loadList(status: tab == "all" ? nil : WStatus.pending) }
     }
 
     private func queueRow(_ wo: WriteOff) -> some View {
